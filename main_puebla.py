@@ -1,20 +1,26 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
 import os
+from contextlib import asynccontextmanager, suppress
+from starlette.middleware.sessions import SessionMiddleware
+import asyncio
+import random
+from io import BytesIO
+import qrcode
+import fitz
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
-from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
-import asyncio
-import random
-import qrcode
-from io import BytesIO
-import fitz
+from aiogram.types import FSInputFile, ContentType, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+import aiohttp
+from urllib.parse import quote
 
 # ==================== CONFIG ====================
 BOT_TOKEN    = os.getenv("BOT_TOKEN_PUEBLA", "")
