@@ -30,12 +30,11 @@ SUPABASE_URL     = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY     = os.getenv("SUPABASE_KEY", "")
 BASE_URL         = "https://smt-puebla-gob-mx.onrender.com"
 OUTPUT_DIR       = "documentos"
-PLANTILLA_PDF    = "PUEBLA_PLANTILLA_COMPLETA.pdf"  # UN SOLO ARCHIVO CON 2 PÁGINAS
+PLANTILLA_PDF    = "PUEBLA_PLANTILLA_COMPLETA.pdf"
 ENTIDAD          = "puebla"
 PRECIO_PERMISO   = 180
 TZ               = "America/Mexico_City"
 
-# FIX: credenciales desde variables de entorno
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "admin123")
 SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24).hex())
@@ -286,128 +285,108 @@ def generar_pdf_unificado_puebla(datos: dict) -> str:
         fecha_hora_completa = f"{fecha_hora_dt.strftime('%d/%m/%Y')} {hora_formateada}"
         rfc_generico        = "XAXX010101000"
         
-        # Formato de fecha para el permiso
         fecha_expedicion = datos['fecha_exp_dt'].strftime("%d DE %B %Y").upper()
         fecha_vencimiento = datos['fecha_ven_dt'].strftime("%d DE %B %Y").upper()
 
-        if os.path.exists(PLANTILLA_PDF):
-            doc_permiso = fitz.open(PLANTILLA_PDF)
-            pg_permiso  = doc_permiso[0]
-            
-            # ==================== PRIMERA PÁGINA - PERMISO ====================
-            # Folio grande (donde dice "24  05914025" en el documento)
-            # Insertar el folio largo en la posición correcta (rojo)
-            pg_permiso.insert_text((245, 165), datos['folio'],
-                fontsize=72, color=(1, 0, 0), fontname="helv-Bold")
-            
-            # MARCA (en rojo)
-            pg_permiso.insert_text((200, 270), datos['marca'].upper(),
-                fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
-            
-            # LÍNEA (en rojo)
-            pg_permiso.insert_text((280, 270), datos['linea'].upper(),
-                fontsize=18, color=(1, 0, 0), fontname="helv")
-            
-            # MODELO / AÑO (en rojo)
-            pg_permiso.insert_text((480, 270), datos['anio'],
-                fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
-            
-            # NÚMERO DE MOTOR (en rojo)
-            pg_permiso.insert_text((200, 310), datos['motor'].upper(),
-                fontsize=18, color=(1, 0, 0), fontname="helv")
-            
-            # NÚMERO DE SERIE (en rojo)
-            pg_permiso.insert_text((340, 310), datos['serie'].upper(),
-                fontsize=17, color=(1, 0, 0), fontname="helv")
-            
-            # COLOR (en rojo)
-            pg_permiso.insert_text((200, 350), datos['color'].upper(),
-                fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
-            
-            # FECHA DE EXPEDICIÓN (en rojo)
-            pg_permiso.insert_text((180, 410), fecha_expedicion,
-                fontsize=16, color=(1, 0, 0), fontname="helv")
-            
-            # VIGENCIA (en rojo)
-            pg_permiso.insert_text((400, 410), fecha_vencimiento,
-                fontsize=16, color=(1, 0, 0), fontname="helv")
-            
-            # QR - donde está el código de barras (en la posición del barcode)
-            img_qr = generar_qr_simple_puebla(datos["folio"])
-            if img_qr:
-                buf = BytesIO(); img_qr.save(buf, format="PNG"); buf.seek(0)
-                qr_pix = fitz.Pixmap(buf.read())
-                # Insertar QR donde está el código de barras (lado derecho)
-                pg_permiso.insert_image(fitz.Rect(490, 200, 590, 300),
-                                        pixmap=qr_pix, overlay=True)
-        else:
-            doc_permiso = fitz.open()
-            doc_permiso.new_page(width=595, height=842).insert_text(
-                (50, 50), "PERMISO PUEBLA (Plantilla no encontrada)", fontsize=20)
-
-        if os.path.exists(PLANTILLA_RECIBO):
-            doc_recibo = fitz.open(PLANTILLA_RECIBO)
-            pg_recibo  = doc_recibo[0]
-            
-            # ==================== SEGUNDA PÁGINA - RECIBO ====================
-            # AGENCIA O DELEGACION (negro)
-            pg_recibo.insert_text((200, 150), "CENTRO INTEGRAL DE SERVICIOS",
-                fontsize=14, color=(0,0,0), fontname="helv-Bold")
-            
-            # FECHA DE EXPEDICIÓN (negro)
-            pg_recibo.insert_text((180, 200), fecha_expedicion,
-                fontsize=14, color=(0,0,0), fontname="helv")
-            
-            # PROPIETARIO (negro)
-            pg_recibo.insert_text((200, 280), datos["nombre"].upper(),
-                fontsize=12, color=(0,0,0), fontname="helv-Bold")
-            
-            # DOMICILIO - CALLE (negro)
-            pg_recibo.insert_text((200, 330), "CALLE: CAMINO REAL XICOHTENCATL",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # DOMICILIO - COLONIA (negro)
-            pg_recibo.insert_text((350, 330), "COLONIA: SAN DIEGO XOCOYUCAN",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # CÓDIGO POSTAL (negro)
-            pg_recibo.insert_text((200, 350), "CODIGO POSTAL: 90122",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # MUNICIPIO (negro)
-            pg_recibo.insert_text((350, 350), "MUNICIPIO: IXTACUIXTLA",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # ENTIDAD FEDERATIVA (negro)
-            pg_recibo.insert_text((200, 370), "ENTIDAD FEDERATIVA: TLAXCALA",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # NÚMERO DE TELÉFONO (negro)
-            pg_recibo.insert_text((350, 370), "NUMERO DE TELEFONO: 2212023076",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # CORREO (negro)
-            pg_recibo.insert_text((200, 390), "CORREO: alonzoerivan@gmail.com",
-                fontsize=10, color=(0,0,0), fontname="helv")
-            
-            # FOLIO GRANDE (negro) - lado derecho
-            pg_recibo.insert_text((420, 150), datos['folio'],
-                fontsize=64, color=(0,0,0), fontname="helv-Bold")
-        else:
-            doc_recibo = fitz.open()
-            doc_recibo.new_page(width=595, height=842).insert_text(
-                (50, 50), "RECIBO (Plantilla no encontrada)", fontsize=20)
-
-        doc_final = fitz.open()
-        doc_final.insert_pdf(doc_permiso)
-        doc_final.insert_pdf(doc_recibo)
-        doc_final.save(out)
-        doc_final.close(); doc_permiso.close()
-        if os.path.exists(PLANTILLA_RECIBO): doc_recibo.close()
+        if not os.path.exists(PLANTILLA_PDF):
+            raise FileNotFoundError(
+                f"❌ FALTA: {PLANTILLA_PDF}\n"
+                f"Debe contener: Página 1 = Permiso, Página 2 = Recibo"
+            )
+        
+        doc = fitz.open(PLANTILLA_PDF)
+        
+        if len(doc) < 2:
+            raise ValueError(
+                f"❌ {PLANTILLA_PDF} debe tener MÍNIMO 2 páginas\n"
+                f"Página 1: Permiso | Página 2: Recibo"
+            )
+        
+        pg_permiso = doc[0]
+        pg_recibo  = doc[1]
+        
+        # PÁGINA 1 - PERMISO (ROJO)
+        print(f"[PDF] Insertando datos en Página 1 (Permiso)...")
+        
+        pg_permiso.insert_text((245, 165), datos['folio'],
+            fontsize=72, color=(1, 0, 0), fontname="helv-Bold")
+        
+        pg_permiso.insert_text((200, 270), datos['marca'].upper(),
+            fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
+        
+        pg_permiso.insert_text((280, 270), datos['linea'].upper(),
+            fontsize=18, color=(1, 0, 0), fontname="helv")
+        
+        pg_permiso.insert_text((480, 270), datos['anio'],
+            fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
+        
+        pg_permiso.insert_text((200, 310), datos['motor'].upper(),
+            fontsize=18, color=(1, 0, 0), fontname="helv")
+        
+        pg_permiso.insert_text((340, 310), datos['serie'].upper(),
+            fontsize=17, color=(1, 0, 0), fontname="helv")
+        
+        pg_permiso.insert_text((200, 350), datos['color'].upper(),
+            fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
+        
+        pg_permiso.insert_text((180, 410), fecha_expedicion,
+            fontsize=16, color=(1, 0, 0), fontname="helv")
+        
+        pg_permiso.insert_text((400, 410), fecha_vencimiento,
+            fontsize=16, color=(1, 0, 0), fontname="helv")
+        
+        img_qr = generar_qr_simple_puebla(datos["folio"])
+        if img_qr:
+            buf = BytesIO(); img_qr.save(buf, format="PNG"); buf.seek(0)
+            qr_pix = fitz.Pixmap(buf.read())
+            pg_permiso.insert_image(fitz.Rect(490, 200, 590, 300),
+                                    pixmap=qr_pix, overlay=True)
+            print(f"[PDF] QR insertado ✅")
+        
+        # PÁGINA 2 - RECIBO (NEGRO)
+        print(f"[PDF] Insertando datos en Página 2 (Recibo)...")
+        
+        pg_recibo.insert_text((200, 150), "CENTRO INTEGRAL DE SERVICIOS",
+            fontsize=14, color=(0,0,0), fontname="helv-Bold")
+        
+        pg_recibo.insert_text((180, 200), fecha_expedicion,
+            fontsize=14, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((200, 280), datos["nombre"].upper(),
+            fontsize=12, color=(0,0,0), fontname="helv-Bold")
+        
+        pg_recibo.insert_text((200, 330), "CALLE: CAMINO REAL XICOHTENCATL",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((350, 330), "COLONIA: SAN DIEGO XOCOYUCAN",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((200, 350), "CODIGO POSTAL: 90122",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((350, 350), "MUNICIPIO: IXTACUIXTLA",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((200, 370), "ENTIDAD FEDERATIVA: TLAXCALA",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((350, 370), "NUMERO DE TELEFONO: 2212023076",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((200, 390), "CORREO: alonzoerivan@gmail.com",
+            fontsize=10, color=(0,0,0), fontname="helv")
+        
+        pg_recibo.insert_text((420, 150), datos['folio'],
+            fontsize=64, color=(0,0,0), fontname="helv-Bold")
+        
+        doc.save(out)
+        doc.close()
         print(f"[PDF] ✅ Generado: {out}")
         return out
+        
     except Exception as e:
-        print(f"[PDF] Error crítico: {e}"); raise e
+        print(f"[PDF] Error crítico: {e}")
+        raise e
 
 # ===================== BACKGROUND TASK =====================
 async def _generar_y_enviar_background(chat_id: int, datos: dict, user_id: int):
@@ -754,19 +733,28 @@ async def telegram_webhook(request: Request):
     except Exception as e:
         print(f"[WEBHOOK] Error: {e}"); return {"ok": False, "error": str(e)}
 
-# ===================== RUTAS WEB - PÁGINA PÚBLICA =====================
+# ===================== RUTAS WEB =====================
 
 @app.get("/", response_class=HTMLResponse)
 async def root_puebla():
-    """Página pública de consulta de folios"""
+    """Página pública - INTERFAZ OFICIAL PUEBLA 1.1"""
     html = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Secretaria de Movilidad y Transporte - Consulta de Permisos">
-    <title>Secretaría de Movilidad y Transporte - Consulta</title>
+    <meta name="description" content="Secretaría de Movilidad y Transporte">
+    <title>Secretaría de Movilidad y Transporte - Consulta de Permisos</title>
+    <link href="https://cdn.jsdelivr.net/npm/uikit@3.23.5/dist/css/uikit.min.css" rel="stylesheet" />
     <style>
+        :root {
+            --hue: 214;
+            --template-bg-light: #f0f4fb;
+            --template-text-dark: #495057;
+            --template-text-light: #ffffff;
+            --template-link-color: #0066cc;
+            --template-special-color: #001B4C;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #495057; }
         .header { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px 0; margin-bottom: 30px; }
@@ -940,7 +928,7 @@ async def root_puebla():
 
 @app.get("/api/consultar_folio/{folio}")
 async def api_consultar_folio(folio: str):
-    """API para consultar folio vía AJAX"""
+    """API para consultar folio"""
     folio = folio.strip().upper()
     try:
         res = supabase.table("folios_registrados").select("*").eq("folio", folio).eq("entidad", ENTIDAD).limit(1).execute()
