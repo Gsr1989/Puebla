@@ -969,468 +969,1527 @@ https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request):
 
+    # ============================
+    # PROTEGER PANEL
+    # ============================
     if not request.session.get("admin"):
         return RedirectResponse("/login", status_code=302)
 
-    try:
-        resp = (
-            supabase
-            .table("folios_registrados")
-            .select("folio,fecha_vencimiento,estado")
-            .eq("entidad", ENTIDAD)
-            .execute()
-        )
-
-        registros = resp.data or []
-
-    except Exception as e:
-        print(f"[ADMIN] Error leyendo folios: {e}")
-        registros = []
-
-    total = len(registros)
-
-    hoy = datetime.now(ZoneInfo(TZ)).date()
-
-    vigentes = 0
-    vencidos = 0
-
-    for row in registros:
-        try:
-            fv = datetime.fromisoformat(
-                str(row["fecha_vencimiento"]).replace("Z", "+00:00")
-            ).date()
-
-            if hoy <= fv:
-                vigentes += 1
-            else:
-                vencidos += 1
-
-        except Exception:
-            pass
-
-    timers = len(timers_activos)
-
-    siguiente = f"{FOLIO_NUM_PREFIJO}{_folio_counter['siguiente']}"
-
     username = html_lib.escape(
-        str(request.session.get("username", "Admin"))
+        str(request.session.get("username", "Administrador"))
     )
+
+    year = datetime.now(ZoneInfo(TZ)).year
 
     return HTMLResponse(f"""
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
 
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>Panel Administrativo Puebla</title>
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+
+<title>
+    Panel Administrativo
+</title>
+
+<link
+    rel="icon"
+    href="https://smt.puebla.gob.mx/templates/puebla/favicon.ico"
+    type="image/vnd.microsoft.icon"
+>
 
 <style>
 
 :root {{
     --vino:#5f1b2d;
-    --vino2:#48101e;
+    --vino-oscuro:#48101e;
     --azul:#001B4C;
     --dorado:#c79b66;
-    --fondo:#f4f5f7;
+    --dorado2:#c09761;
+    --gris:#949494;
+    --gris-claro:#f4f5f7;
+    --blanco:#ffffff;
 }}
 
 * {{
     box-sizing:border-box;
+    margin:0;
+    padding:0;
+}}
+
+html,
+body {{
+    min-height:100%;
 }}
 
 body {{
-    margin:0;
-    background:var(--fondo);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background:
+        var(--gris-claro);
+
     color:#495057;
 }}
 
-.layout {{
-    min-height:100vh;
-    display:grid;
-    grid-template-columns:250px 1fr;
+
+/* ==================================================
+   HEADER INSTITUCIONAL
+================================================== */
+
+.header {{
+    background:white;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0,0,0,.08);
+
+    position:relative;
+
+    z-index:20;
 }}
+
+.header-inner {{
+    max-width:1380px;
+
+    margin:auto;
+
+    padding:
+        18px 30px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:
+        space-between;
+
+    gap:30px;
+}}
+
+.logos {{
+    display:flex;
+
+    align-items:center;
+
+    gap:22px;
+
+    min-width:0;
+}}
+
+.logo-gob {{
+    width:245px;
+
+    max-height:82px;
+
+    object-fit:contain;
+}}
+
+.logo-secretaria {{
+    width:225px;
+
+    max-height:88px;
+
+    object-fit:contain;
+}}
+
+.frase-header {{
+    width:300px;
+
+    max-height:90px;
+
+    object-fit:contain;
+}}
+
+
+/* ==================================================
+   BARRA SUPERIOR
+================================================== */
+
+.barra {{
+    background:
+        var(--vino);
+
+    color:white;
+}}
+
+.barra-inner {{
+    max-width:1380px;
+
+    margin:auto;
+
+    min-height:54px;
+
+    padding:
+        0 30px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:
+        space-between;
+
+    gap:20px;
+}}
+
+.barra-titulo {{
+    font-size:15px;
+
+    font-weight:600;
+}}
+
+.usuario {{
+    display:flex;
+
+    align-items:center;
+
+    gap:14px;
+
+    font-size:14px;
+}}
+
+.btn-salir {{
+    display:inline-flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    padding:
+        9px 16px;
+
+    border-radius:8px;
+
+    background:
+        rgba(255,255,255,.13);
+
+    color:white;
+
+    text-decoration:none;
+
+    font-weight:600;
+
+    transition:.2s;
+}}
+
+.btn-salir:hover {{
+    background:
+        rgba(255,255,255,.22);
+}}
+
+
+/* ==================================================
+   LAYOUT
+================================================== */
+
+.layout {{
+    min-height:
+        calc(100vh - 190px);
+
+    display:grid;
+
+    grid-template-columns:
+        250px 1fr;
+}}
+
+
+/* ==================================================
+   SIDEBAR
+================================================== */
 
 .sidebar {{
-    background:var(--vino);
-    color:white;
-    padding:24px 17px;
+    background:
+        #ffffff;
+
+    border-right:
+        1px solid #e7e7e7;
+
+    padding:
+        26px 16px;
+
+    box-shadow:
+        2px 0 8px
+        rgba(0,0,0,.025);
 }}
 
-.brand {{
-    padding:0 10px 23px;
-    border-bottom:1px solid rgba(255,255,255,.18);
-    margin-bottom:20px;
+.sidebar-title {{
+    color:
+        var(--gris);
+
+    font-size:
+        11px;
+
+    font-weight:700;
+
+    letter-spacing:
+        1.2px;
+
+    text-transform:
+        uppercase;
+
+    padding:
+        0 12px 12px;
 }}
 
-.brand h2 {{
-    margin:0;
-    font-size:1.25rem;
+.menu-admin {{
+    list-style:none;
 }}
 
-.brand p {{
-    margin:5px 0 0;
-    opacity:.72;
-    font-size:.8rem;
+.menu-admin li {{
+    margin-bottom:5px;
 }}
 
-.menu {{
+.menu-admin a {{
     display:flex;
-    flex-direction:column;
-    gap:6px;
-}}
 
-.menu a {{
-    color:white;
+    align-items:center;
+
+    gap:10px;
+
+    padding:
+        12px 13px;
+
+    border-radius:
+        9px;
+
     text-decoration:none;
-    padding:12px 13px;
-    border-radius:8px;
-    font-size:.92rem;
+
+    color:#555;
+
+    font-size:14px;
+
+    transition:.18s;
 }}
 
-.menu a:hover,
-.menu a.active {{
-    background:rgba(255,255,255,.14);
+.menu-admin a:hover {{
+    background:
+        #f5f1ed;
+
+    color:
+        var(--vino);
 }}
 
-.logout {{
-    margin-top:12px;
-    background:rgba(0,0,0,.15);
+.menu-admin a.activo {{
+    background:
+        #f3ebe4;
+
+    color:
+        var(--vino);
+
+    font-weight:700;
 }}
+
+.menu-separador {{
+    height:1px;
+
+    background:#ededed;
+
+    margin:
+        18px 8px;
+}}
+
+.menu-admin a.salir {{
+    color:#9d2637;
+}}
+
+
+/* ==================================================
+   CONTENIDO
+================================================== */
 
 .main {{
     min-width:0;
 }}
 
-.topbar {{
+.top-content {{
     background:white;
-    min-height:72px;
-    padding:0 28px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    box-shadow:0 2px 8px rgba(0,0,0,.05);
+
+    border-bottom:
+        1px solid #e8e8e8;
+
+    padding:
+        22px 30px;
 }}
 
-.topbar h1 {{
-    margin:0;
-    color:var(--azul);
-    font-size:1.35rem;
+.top-content h1 {{
+    color:
+        var(--azul);
+
+    font-size:
+        25px;
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        4px;
 }}
 
-.user {{
-    color:#777;
-    font-size:.9rem;
+.top-content p {{
+    color:
+        var(--gris);
+
+    font-size:
+        14px;
 }}
 
 .content {{
-    padding:30px;
+    padding:
+        28px 30px
+        45px;
+
+    max-width:
+        1500px;
+
+    margin:auto;
 }}
+
+
+/* ==================================================
+   TARJETAS DE ESTADÍSTICAS
+================================================== */
 
 .stats {{
     display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:20px;
-    margin-bottom:28px;
-}}
 
-.stat {{
-    background:white;
-    border-radius:14px;
-    padding:24px;
-    box-shadow:0 3px 12px rgba(0,0,0,.06);
-}}
+    grid-template-columns:
+        repeat(4,minmax(0,1fr));
 
-.stat-label {{
-    color:#888;
-    font-size:.77rem;
-    font-weight:700;
-    text-transform:uppercase;
-    margin-bottom:10px;
-}}
+    gap:18px;
 
-.stat-value {{
-    color:var(--azul);
-    font-size:2rem;
-    font-weight:700;
-}}
-
-.stat-sub {{
-    margin-top:5px;
-    color:#999;
-    font-size:.8rem;
-}}
-
-.columns {{
-    display:grid;
-    grid-template-columns:1.3fr 1fr;
-    gap:20px;
+    margin-bottom:
+        22px;
 }}
 
 .card {{
     background:white;
-    border-radius:14px;
-    padding:25px;
-    box-shadow:0 3px 12px rgba(0,0,0,.06);
+
+    border-radius:
+        15px;
+
+    padding:
+        22px;
+
+    box-shadow:
+        0 3px 14px
+        rgba(0,0,0,.055);
+}}
+
+.stat {{
+    min-height:
+        125px;
+
+    position:relative;
+
+    overflow:hidden;
+}}
+
+.stat::after {{
+    content:"";
+
+    position:absolute;
+
+    left:0;
+
+    bottom:0;
+
+    width:100%;
+
+    height:4px;
+
+    background:
+        var(--dorado);
+}}
+
+.stat-label {{
+    color:
+        var(--gris);
+
+    font-size:
+        11px;
+
+    text-transform:
+        uppercase;
+
+    letter-spacing:
+        1px;
+
+    font-weight:
+        700;
+
+    margin-bottom:
+        13px;
+}}
+
+.stat-number {{
+    color:
+        var(--azul);
+
+    font-size:
+        34px;
+
+    line-height:1;
+
+    font-weight:
+        700;
+
+    margin-bottom:
+        8px;
+}}
+
+.stat-desc {{
+    color:#888;
+
+    font-size:
+        12px;
+}}
+
+
+/* ==================================================
+   CUADRÍCULA PRINCIPAL
+================================================== */
+
+.dashboard-grid {{
+    display:grid;
+
+    grid-template-columns:
+        1.35fr .8fr;
+
+    gap:18px;
 }}
 
 .card h2 {{
-    margin:0 0 20px;
-    color:var(--azul);
-    font-size:1.1rem;
+    color:
+        var(--azul);
+
+    font-size:
+        18px;
+
+    font-weight:
+        500;
+
+    margin-bottom:
+        18px;
 }}
+
+
+/* ==================================================
+   ACCESOS RÁPIDOS
+================================================== */
 
 .actions {{
     display:grid;
-    grid-template-columns:repeat(2,1fr);
+
+    grid-template-columns:
+        1fr 1fr;
+
     gap:12px;
 }}
 
 .action {{
+    border:
+        1px solid #ececec;
+
+    border-radius:
+        11px;
+
+    padding:
+        17px;
+
     text-decoration:none;
-    color:#555;
-    border:1px solid #ececec;
-    border-radius:10px;
-    padding:17px;
+
+    color:#666;
+
     transition:.2s;
+
+    background:#fff;
 }}
 
 .action:hover {{
-    border-color:var(--dorado);
-    transform:translateY(-1px);
+    transform:
+        translateY(-2px);
+
+    border-color:
+        #d7bd9d;
+
+    box-shadow:
+        0 4px 12px
+        rgba(0,0,0,.06);
+}}
+
+.action-icon {{
+    font-size:
+        22px;
+
+    margin-bottom:
+        10px;
 }}
 
 .action strong {{
     display:block;
-    color:var(--azul);
-    margin-bottom:4px;
+
+    color:
+        var(--azul);
+
+    font-size:
+        14px;
+
+    margin-bottom:
+        5px;
 }}
 
 .action span {{
+    font-size:
+        12px;
+
     color:#888;
-    font-size:.8rem;
+
+    line-height:1.4;
 }}
 
-.status {{
-    padding:11px 0;
-    border-bottom:1px solid #eee;
+
+/* ==================================================
+   ESTADO DEL SISTEMA
+================================================== */
+
+.estado-sistema {{
     display:flex;
-    justify-content:space-between;
-    gap:20px;
+
+    align-items:center;
+
+    gap:12px;
+
+    background:
+        #e8f5eb;
+
+    color:
+        #276738;
+
+    padding:
+        14px;
+
+    border-radius:
+        10px;
+
+    margin-bottom:
+        15px;
 }}
 
-.status:last-child {{
+.estado-dot {{
+    width:12px;
+
+    height:12px;
+
+    border-radius:50%;
+
+    background:
+        #35a254;
+
+    box-shadow:
+        0 0 0 5px
+        rgba(53,162,84,.12);
+}}
+
+.system-row {{
+    display:flex;
+
+    justify-content:
+        space-between;
+
+    gap:12px;
+
+    padding:
+        11px 0;
+
+    border-bottom:
+        1px solid #eee;
+
+    font-size:
+        13px;
+}}
+
+.system-row:last-child {{
     border-bottom:0;
 }}
 
-.ok {{
-    color:#198754;
-    font-weight:650;
+.system-row span:first-child {{
+    color:#777;
 }}
 
-@media(max-width:900px) {{
+.system-row strong {{
+    color:
+        var(--azul);
+}}
+
+
+/* ==================================================
+   BOTÓN SALIR GRANDE
+================================================== */
+
+.salir-card {{
+    margin-top:
+        18px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #5f1b2d,
+            #48101e
+        );
+
+    color:white;
+}}
+
+.salir-card h2 {{
+    color:white;
+}}
+
+.salir-card p {{
+    color:
+        rgba(255,255,255,.76);
+
+    font-size:
+        13px;
+
+    line-height:
+        1.5;
+
+    margin-bottom:
+        16px;
+}}
+
+.salir-grande {{
+    display:inline-block;
+
+    background:white;
+
+    color:
+        var(--vino);
+
+    text-decoration:none;
+
+    padding:
+        11px 18px;
+
+    border-radius:
+        8px;
+
+    font-weight:
+        700;
+
+    font-size:
+        14px;
+}}
+
+
+/* ==================================================
+   FOOTER INSTITUCIONAL
+================================================== */
+
+.footer {{
+    background:
+        var(--vino);
+
+    color:white;
+
+    padding:
+        42px 25px;
+}}
+
+.footer-inner {{
+    max-width:
+        1150px;
+
+    margin:auto;
+
+    display:grid;
+
+    grid-template-columns:
+        1.1fr 1fr;
+
+    gap:
+        55px;
+
+    align-items:center;
+}}
+
+.footer-logo {{
+    max-width:
+        480px;
+
+    width:100%;
+}}
+
+.footer-links {{
+    list-style:none;
+}}
+
+.footer-links li {{
+    margin:
+        7px 0;
+}}
+
+.footer-links a {{
+    color:
+        #fffbef;
+
+    text-decoration:none;
+
+    font-size:
+        14px;
+
+    line-height:
+        1.55;
+}}
+
+.footer-links a:hover {{
+    text-decoration:
+        underline;
+}}
+
+.copyright {{
+    padding:
+        15px 20px;
+
+    background:
+        var(--vino-oscuro);
+
+    color:
+        rgba(255,255,255,.72);
+
+    text-align:center;
+
+    font-size:
+        12px;
+}}
+
+
+/* ==================================================
+   RESPONSIVE
+================================================== */
+
+@media
+(max-width:1000px) {{
+
+    .stats {{
+        grid-template-columns:
+            1fr 1fr;
+    }}
+
+    .dashboard-grid {{
+        grid-template-columns:
+            1fr;
+    }}
+
+}}
+
+@media
+(max-width:800px) {{
+
+    .header-inner {{
+        padding:
+            14px 16px;
+    }}
+
+    .logos {{
+        gap:8px;
+    }}
+
+    .logo-gob {{
+        width:
+            52%;
+    }}
+
+    .logo-secretaria {{
+        width:
+            46%;
+    }}
+
+    .frase-header {{
+        display:none;
+    }}
+
+    .barra-inner {{
+        padding:
+            0 16px;
+    }}
+
     .layout {{
-        grid-template-columns:1fr;
+        display:block;
     }}
 
     .sidebar {{
+        border-right:0;
+
+        border-bottom:
+            1px solid #ddd;
+
+        padding:
+            10px;
+    }}
+
+    .sidebar-title {{
+        display:none;
+    }}
+
+    .menu-admin {{
+        display:flex;
+
+        overflow-x:auto;
+
+        gap:5px;
+    }}
+
+    .menu-admin li {{
+        margin:0;
+
+        flex:
+            0 0 auto;
+    }}
+
+    .menu-admin a {{
+        white-space:nowrap;
+    }}
+
+    .menu-separador {{
+        display:none;
+    }}
+
+    .content {{
+        padding:
+            20px 14px
+            35px;
+    }}
+
+    .top-content {{
+        padding:
+            19px 16px;
+    }}
+
+    .footer-inner {{
+        grid-template-columns:
+            1fr;
+
+        text-align:center;
+    }}
+
+    .footer-logo {{
+        margin:auto;
+    }}
+
+}}
+
+@media
+(max-width:560px) {{
+
+    .barra-titulo {{
+        display:none;
+    }}
+
+    .barra-inner {{
+        justify-content:
+            flex-end;
+    }}
+
+    .usuario span {{
         display:none;
     }}
 
     .stats {{
-        grid-template-columns:repeat(2,1fr);
+        grid-template-columns:
+            1fr 1fr;
+
+        gap:10px;
     }}
 
-    .columns {{
-        grid-template-columns:1fr;
-    }}
-}}
+    .stat {{
+        min-height:
+            105px;
 
-@media(max-width:550px) {{
-    .content {{
-        padding:18px;
+        padding:
+            17px;
     }}
 
-    .stats {{
-        grid-template-columns:1fr;
+    .stat-number {{
+        font-size:
+            28px;
     }}
 
     .actions {{
-        grid-template-columns:1fr;
+        grid-template-columns:
+            1fr;
     }}
+
 }}
 
 </style>
 
 </head>
 
+
 <body>
 
-<div class="layout">
 
-<aside class="sidebar">
+<!-- ==================================================
+     LOGOS SUPERIORES
+================================================== -->
 
-    <div class="brand">
-        <h2>Panel Puebla</h2>
-        <p>Administración del sistema</p>
-    </div>
+<header class="header">
 
-    <nav class="menu">
+    <div class="header-inner">
 
-        <a href="/admin" class="active">
-            📊 Dashboard
-        </a>
+        <div class="logos">
 
-        <a href="/admin/folios">
-            📄 Folios
-        </a>
+            <a
+                href="https://puebla.gob.mx/"
+                target="_blank"
+                rel="noopener"
+            >
 
-        <a href="/admin/crear_folio">
-            ➕ Crear folio
-        </a>
+                <img
+                    class="logo-gob"
+                    src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+                    alt="Gobierno del Estado de Puebla"
+                >
 
-        <a href="/admin/usuarios">
-            👥 Usuarios terceros
-        </a>
-
-        <a href="/admin/tablas">
-            🗄️ Tablas
-        </a>
-
-        <a href="/admin/auditoria">
-            🧾 Auditoría
-        </a>
-
-        <a href="/logout" class="logout">
-            🚪 Salir
-        </a>
-
-    </nav>
-
-</aside>
+            </a>
 
 
-<section class="main">
+            <img
+                class="logo-secretaria"
+                src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
+                alt="Secretaría de Movilidad y Transporte"
+            >
 
-<header class="topbar">
+        </div>
 
-    <h1>Dashboard</h1>
 
-    <div class="user">
-        👤 {username}
+        <img
+            class="frase-header"
+            src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
+            alt="Puebla"
+        >
+
     </div>
 
 </header>
 
 
-<main class="content">
+<!-- ==================================================
+     BARRA DE ADMIN
+================================================== -->
 
-<div class="stats">
+<div class="barra">
 
-    <div class="stat">
-        <div class="stat-label">Folios registrados</div>
-        <div class="stat-value">{total}</div>
-        <div class="stat-sub">Puebla</div>
-    </div>
+    <div class="barra-inner">
 
-    <div class="stat">
-        <div class="stat-label">Vigentes</div>
-        <div class="stat-value">{vigentes}</div>
-        <div class="stat-sub">Dentro de vigencia</div>
-    </div>
+        <div class="barra-titulo">
+            Panel Administrativo
+        </div>
 
-    <div class="stat">
-        <div class="stat-label">Vencidos</div>
-        <div class="stat-value">{vencidos}</div>
-        <div class="stat-sub">Fuera de vigencia</div>
-    </div>
+        <div class="usuario">
 
-    <div class="stat">
-        <div class="stat-label">Timers activos</div>
-        <div class="stat-value">{timers}</div>
-        <div class="stat-sub">Pendientes de pago</div>
+            <span>
+                👤 {username}
+            </span>
+
+            <a
+                class="btn-salir"
+                href="/logout"
+            >
+                🚪 Cerrar sesión
+            </a>
+
+        </div>
+
     </div>
 
 </div>
 
 
-<div class="columns">
+<!-- ==================================================
+     PANEL
+================================================== -->
 
-<section class="card">
+<div class="layout">
 
-    <h2>Accesos rápidos</h2>
 
-    <div class="actions">
+<!-- ==================================================
+     MENÚ IZQUIERDO
+================================================== -->
 
-        <a class="action" href="/admin/crear_folio">
-            <strong>➕ Crear permiso</strong>
-            <span>Generar un folio manualmente</span>
-        </a>
+<aside class="sidebar">
 
-        <a class="action" href="/admin/folios">
-            <strong>📄 Administrar folios</strong>
-            <span>Consultar, editar y eliminar</span>
-        </a>
+    <div class="sidebar-title">
+        Administración
+    </div>
 
-        <a class="action" href="/admin/usuarios">
-            <strong>👥 Usuarios terceros</strong>
-            <span>Cuentas y paquetes de folios</span>
-        </a>
+    <ul class="menu-admin">
 
-        <a class="action" href="/admin/tablas">
-            <strong>🗄️ Tablas Supabase</strong>
-            <span>Consultar datos del sistema</span>
-        </a>
+        <li>
+            <a
+                class="activo"
+                href="/admin"
+            >
+                📊 Dashboard
+            </a>
+        </li>
+
+        <li>
+            <a href="#">
+                📄 Registros
+            </a>
+        </li>
+
+        <li>
+            <a href="#">
+                👥 Usuarios
+            </a>
+        </li>
+
+        <li>
+            <a href="#">
+                🧾 Auditoría
+            </a>
+        </li>
+
+        <li>
+            <a href="#">
+                ⚙️ Configuración
+            </a>
+        </li>
+
+        <li class="menu-separador"></li>
+
+        <li>
+            <a
+                class="salir"
+                href="/logout"
+            >
+                🚪 Cerrar sesión
+            </a>
+        </li>
+
+    </ul>
+
+</aside>
+
+
+<!-- ==================================================
+     CONTENIDO
+================================================== -->
+
+<main class="main">
+
+    <div class="top-content">
+
+        <h1>
+            Dashboard
+        </h1>
+
+        <p>
+            Administración general del sistema Puebla
+        </p>
 
     </div>
 
-</section>
+
+    <div class="content">
 
 
-<section class="card">
+        <!-- ESTADÍSTICAS -->
 
-    <h2>Estado del sistema</h2>
+        <section class="stats">
 
-    <div class="status">
-        <span>Supabase</span>
-        <span class="ok">● Conectado</span>
+            <div class="card stat">
+
+                <div class="stat-label">
+                    Registros
+                </div>
+
+                <div class="stat-number">
+                    —
+                </div>
+
+                <div class="stat-desc">
+                    Folios registrados
+                </div>
+
+            </div>
+
+
+            <div class="card stat">
+
+                <div class="stat-label">
+                    Vigentes
+                </div>
+
+                <div class="stat-number">
+                    —
+                </div>
+
+                <div class="stat-desc">
+                    Permisos vigentes
+                </div>
+
+            </div>
+
+
+            <div class="card stat">
+
+                <div class="stat-label">
+                    Vencidos
+                </div>
+
+                <div class="stat-number">
+                    —
+                </div>
+
+                <div class="stat-desc">
+                    Permisos vencidos
+                </div>
+
+            </div>
+
+
+            <div class="card stat">
+
+                <div class="stat-label">
+                    Pendientes
+                </div>
+
+                <div class="stat-number">
+                    —
+                </div>
+
+                <div class="stat-desc">
+                    Registros pendientes
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- CUERPO -->
+
+        <section class="dashboard-grid">
+
+
+            <div class="card">
+
+                <h2>
+                    Accesos rápidos
+                </h2>
+
+
+                <div class="actions">
+
+                    <a
+                        class="action"
+                        href="#"
+                    >
+
+                        <div class="action-icon">
+                            📄
+                        </div>
+
+                        <strong>
+                            Registros
+                        </strong>
+
+                        <span>
+                            Consultar y administrar
+                            los folios registrados.
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        class="action"
+                        href="#"
+                    >
+
+                        <div class="action-icon">
+                            👥
+                        </div>
+
+                        <strong>
+                            Usuarios
+                        </strong>
+
+                        <span>
+                            Administrar usuarios
+                            y accesos.
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        class="action"
+                        href="#"
+                    >
+
+                        <div class="action-icon">
+                            🧾
+                        </div>
+
+                        <strong>
+                            Auditoría
+                        </strong>
+
+                        <span>
+                            Revisar movimientos
+                            y actividad.
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        class="action"
+                        href="#"
+                    >
+
+                        <div class="action-icon">
+                            ⚙️
+                        </div>
+
+                        <strong>
+                            Configuración
+                        </strong>
+
+                        <span>
+                            Configuración general
+                            del sistema.
+                        </span>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <div>
+
+                <div class="card">
+
+                    <h2>
+                        Estado del sistema
+                    </h2>
+
+
+                    <div class="estado-sistema">
+
+                        <div class="estado-dot"></div>
+
+                        <strong>
+                            Sistema operativo
+                        </strong>
+
+                    </div>
+
+
+                    <div class="system-row">
+
+                        <span>
+                            Aplicación
+                        </span>
+
+                        <strong>
+                            En línea
+                        </strong>
+
+                    </div>
+
+
+                    <div class="system-row">
+
+                        <span>
+                            Entidad
+                        </span>
+
+                        <strong>
+                            Puebla
+                        </strong>
+
+                    </div>
+
+
+                    <div class="system-row">
+
+                        <span>
+                            Bot Telegram
+                        </span>
+
+                        <strong>
+                            Configurado
+                        </strong>
+
+                    </div>
+
+
+                    <div class="system-row">
+
+                        <span>
+                            Base de datos
+                        </span>
+
+                        <strong>
+                            Supabase
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="card salir-card">
+
+                    <h2>
+                        Finalizar sesión
+                    </h2>
+
+                    <p>
+                        Cierra tu sesión administrativa
+                        cuando termines de trabajar.
+                    </p>
+
+                    <a
+                        class="salir-grande"
+                        href="/logout"
+                    >
+                        🚪 Cerrar sesión
+                    </a>
+
+                </div>
+
+            </div>
+
+
+        </section>
+
+
     </div>
-
-    <div class="status">
-        <span>Telegram bot</span>
-        <span class="ok">● Configurado</span>
-    </div>
-
-    <div class="status">
-        <span>Entidad</span>
-        <span>{ENTIDAD.upper()}</span>
-    </div>
-
-    <div class="status">
-        <span>Precio</span>
-        <span>${PRECIO} MXN</span>
-    </div>
-
-    <div class="status">
-        <span>Siguiente folio</span>
-        <span>{siguiente}</span>
-    </div>
-
-</section>
-
-</div>
 
 </main>
 
-</section>
+</div>
+
+
+<!-- ==================================================
+     FOOTER CON LOGO
+================================================== -->
+
+<footer class="footer">
+
+    <div class="footer-inner">
+
+        <div>
+
+            <img
+                class="footer-logo"
+                src="https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg"
+                alt="Gobierno del Estado de Puebla"
+            >
+
+        </div>
+
+
+        <ul class="footer-links">
+
+            <li>
+
+                <a
+                    href="https://planeader.puebla.gob.mx/"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    PLAN ESTATAL DE DESARROLLO
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a
+                    href="https://transparenciafiscal.puebla.gob.mx/"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    TRANSPARENCIA FISCAL
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a
+                    href="https://www.gob.mx/empleo"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    PORTAL DEL EMPLEO
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a
+                    href="https://www.gob.mx/presidencia"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    PRESIDENCIA DE LA REPÚBLICA
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a
+                    href="https://lgcg.puebla.gob.mx/"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    LEY GENERAL DE
+                    CONTABILIDAD GUBERNAMENTAL
+                </a>
+
+            </li>
+
+        </ul>
+
+    </div>
+
+</footer>
+
+
+<div class="copyright">
+
+    © {year} Gobierno del Estado de Puebla
 
 </div>
 
-</body>
-</html>
-""")
+
+</
 
 @app.post("/login")
 async def login_post(
