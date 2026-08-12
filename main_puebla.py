@@ -204,22 +204,22 @@ def generar_pdf(datos: dict) -> str:
         # PÁGINA 1 - PERMISO (ROJO) - Fuente SEGURA: "helv"
         pg_permiso.insert_text((245, 280), datos['folio'],
             fontsize=80, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((60, 430), datos['marca'].upper(),
+        pg_permiso.insert_text((60, 440), datos['marca'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((220, 430), datos['linea'].upper(),
+        pg_permiso.insert_text((220, 440), datos['linea'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((280, 430), datos['anio'],
+        pg_permiso.insert_text((380, 440), datos['anio'],
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((200, 310), datos['motor'].upper(),
-            fontsize=18, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((340, 310), datos['serie'].upper(),
-            fontsize=17, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((200, 350), datos['color'].upper(),
-            fontsize=20, color=(1, 0, 0), fontname="helv")
+        pg_permiso.insert_text((60, 480), datos['motor'].upper(),
+            fontsize=12, color=(1, 0, 0), fontname="helv")
+        pg_permiso.insert_text((220, 550), datos['serie'].upper(),
+            fontsize=12, color=(1, 0, 0), fontname="helv")
+        pg_permiso.insert_text((60, 600), datos['color'].upper(),
+            fontsize=12, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((180, 410), datos['fecha_exp'],
-            fontsize=16, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((400, 410), datos['fecha_ven'],
-            fontsize=16, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(1, 0, 0), fontname="helv")
         
         # QR
         qr = qrcode.QRCode()
