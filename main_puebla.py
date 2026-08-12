@@ -9,10 +9,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
-from aiogram.types import FSInputFile, ContentType, InlineKeyboardMarkup, InlineKeyboardButton
-from contextlib import asynccontextmanager, suppress
+from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
-import aiohttp
 import random
 import qrcode
 from io import BytesIO
@@ -39,7 +37,6 @@ dp      = Dispatcher(storage=storage)
 # ==================== TIMERS ====================
 timers_activos = {}
 user_folios = {}
-TOTAL_MINUTOS_TIMER = 36 * 60
 
 async def eliminar_folio_automatico(folio: str):
     try:
@@ -106,9 +103,6 @@ def limpiar_timer_folio(folio: str):
     if uid in user_folios and folio in user_folios[uid]:
         user_folios[uid].remove(folio)
         if not user_folios[uid]: del user_folios[uid]
-
-def obtener_folios_usuario(user_id: int) -> list:
-    return user_folios.get(user_id, [])
 
 # ==================== FOLIOS ====================
 FOLIO_NUM_PREFIJO = "722"
@@ -190,21 +184,21 @@ def generar_pdf(datos: dict) -> str:
         pg_permiso = doc[0]
         pg_recibo = doc[1]
         
-        # PÁGINA 1 - PERMISO (ROJO)
+        # PÁGINA 1 - PERMISO (ROJO) - Fuente SEGURA: "helv"
         pg_permiso.insert_text((245, 165), datos['folio'],
-            fontsize=72, color=(1, 0, 0), fontname="helv-Bold")
+            fontsize=72, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((200, 270), datos['marca'].upper(),
-            fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
+            fontsize=20, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((280, 270), datos['linea'].upper(),
             fontsize=18, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((480, 270), datos['anio'],
-            fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
+            fontsize=20, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((200, 310), datos['motor'].upper(),
             fontsize=18, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((340, 310), datos['serie'].upper(),
             fontsize=17, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((200, 350), datos['color'].upper(),
-            fontsize=20, color=(1, 0, 0), fontname="helv-Bold")
+            fontsize=20, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((180, 410), datos['fecha_exp'],
             fontsize=16, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((400, 410), datos['fecha_ven'],
@@ -221,15 +215,15 @@ def generar_pdf(datos: dict) -> str:
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(fitz.Rect(490, 200, 590, 300), pixmap=qr_pix, overlay=True)
         
-        # PÁGINA 2 - RECIBO (NEGRO)
+        # PÁGINA 2 - RECIBO (NEGRO) - Fuente SEGURA: "helv"
         pg_recibo.insert_text((200, 150), "CENTRO INTEGRAL DE SERVICIOS",
-            fontsize=14, color=(0,0,0), fontname="helv-Bold")
+            fontsize=14, color=(0,0,0), fontname="helv")
         pg_recibo.insert_text((180, 200), datos['fecha_exp'],
             fontsize=14, color=(0,0,0), fontname="helv")
         pg_recibo.insert_text((200, 280), datos["nombre"].upper(),
-            fontsize=12, color=(0,0,0), fontname="helv-Bold")
+            fontsize=12, color=(0,0,0), fontname="helv")
         pg_recibo.insert_text((420, 150), datos['folio'],
-            fontsize=64, color=(0,0,0), fontname="helv-Bold")
+            fontsize=64, color=(0,0,0), fontname="helv")
         
         doc.save(out)
         doc.close()
@@ -410,25 +404,28 @@ async def webhook(request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     html = """<!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Secretaría de Movilidad y Transporte - Consulta de Permisos</title>
     <link href="https://cdn.jsdelivr.net/npm/uikit@3.23.5/dist/css/uikit.min.css" rel="stylesheet" />
     <style>
-        :root { --hue: 214; --template-special-color: #001B4C; }
+        :root { --template-special-color: #001B4C; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #495057; }
-        .header { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px 0; margin-bottom: 30px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif; background: #f5f5f5; color: #495057; }
+        .header { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px 0; }
         .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
-        .header-inner { display: flex; align-items: center; justify-content: space-between; }
-        .consulta-section { background: white; border-radius: 20px; padding: 40px; margin: 40px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .logo-section { display: flex; align-items: center; gap: 15px; }
+        .logo-section img { height: 60px; }
+        .header h1 { font-size: 1.5rem; color: #001B4C; font-weight: 300; margin: 0; }
+        .header p { color: #949494; font-size: 0.9rem; margin: 5px 0 0 0; }
+        .consulta-section { background: white; border-radius: 20px; padding: 40px; margin: 40px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 900px; }
         .consulta-titulo { font-size: 2rem; color: #001B4C; text-align: center; margin-bottom: 30px; font-weight: 300; }
         .formulario-consulta { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; margin-bottom: 40px; align-items: flex-end; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.95rem; font-weight: 600; color: #495057; margin-bottom: 8px; }
-        .form-group input { padding: 12px 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        .form-group input { padding: 12px 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; font-family: inherit; }
         .form-group input:focus { outline: none; border-color: #001B4C; box-shadow: 0 0 0 3px rgba(0, 27, 76, 0.1); }
         .btn-consultar { padding: 12px 30px; background: #c79b66; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
         .btn-consultar:hover { background: #b8894e; }
@@ -448,15 +445,17 @@ async def root():
         .loading.active { display: block; }
         .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #c79b66; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @media (max-width: 768px) { .formulario-consulta { grid-template-columns: 1fr; } .btn-consultar { width: 100%; } .resultado-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .formulario-consulta { grid-template-columns: 1fr; } .btn-consultar { width: 100%; } .resultado-grid { grid-template-columns: 1fr; } .header { padding: 15px 0; } .header h1 { font-size: 1.2rem; } }
     </style>
 </head>
 <body>
     <header class="header">
-        <div class="header-inner container">
-            <div>
-                <h1 style="font-size: 1.5rem; color: #001B4C; font-weight: 300;">Secretaría de Movilidad y Transporte</h1>
-                <p style="color: #949494; font-size: 0.9rem;">Consulta de Permisos</p>
+        <div class="container">
+            <div class="logo-section">
+                <div>
+                    <h1>Secretaría de Movilidad y Transporte</h1>
+                    <p>Consulta de Permisos Vehiculares</p>
+                </div>
             </div>
         </div>
     </header>
