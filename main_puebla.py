@@ -1,4 +1,14 @@
-import Command
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from supabase import create_client, Client
+import os
+from aiogram import Bot, Dispatcher, types
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+from aiogram.filters import Command
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
 import random
@@ -1060,7 +1070,7 @@ function esc(valor) {
 </html>"""
 
     return HTMLResponse(content=html)
-        
+
 @app.get("/estado_folio/{folio}", response_class=HTMLResponse)
 async def estado_folio_qr(folio: str):
     """Endpoint para escaneo de QR - Muestra página con datos del folio"""
