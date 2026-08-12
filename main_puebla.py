@@ -33,6 +33,16 @@ PLANTILLA    = "PUEBLA_PLANTILLA_COMPLETA.pdf"
 ENTIDAD      = "puebla"
 PRECIO       = 180
 TZ           = "America/Mexico_City"
+ADMIN_USER = os.getenv("ADMIN_USER", "")
+ADMIN_PASS = os.getenv("ADMIN_PASS", "")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+
+if not ADMIN_USER or not ADMIN_PASS:
+    print("[WARN] ADMIN_USER / ADMIN_PASS no configurados")
+
+if not SECRET_KEY:
+    print("[WARN] SECRET_KEY no configurada; usando temporal")
+    SECRET_KEY = os.urandom(32).hex()
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
