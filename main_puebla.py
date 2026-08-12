@@ -203,12 +203,12 @@ def generar_pdf(datos: dict) -> str:
         
         # PÁGINA 1 - PERMISO (ROJO) - Fuente SEGURA: "helv"
         pg_permiso.insert_text((245, 265), datos['folio'],
-            fontsize=72, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((100, 470), datos['marca'].upper(),
-            fontsize=20, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((280, 270), datos['linea'].upper(),
+            fontsize=77, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((60, 450), datos['marca'].upper(),
+            fontsize=12, color=(1, 0, 0), fontname="helv")
+        pg_permiso.insert_text((120, 450), datos['linea'].upper(),
             fontsize=18, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((480, 270), datos['anio'],
+        pg_permiso.insert_text((180, 450), datos['anio'],
             fontsize=20, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((200, 310), datos['motor'].upper(),
             fontsize=18, color=(1, 0, 0), fontname="helv")
