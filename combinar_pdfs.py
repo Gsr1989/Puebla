@@ -12,8 +12,8 @@ def combinar_pdfs_puebla():
     Combina los dos PDFs en uno solo con ambas páginas
     """
     
-    pdf_permiso = "DIGITAL_PUEBLA.pdf"
-    pdf_recibo  = "Recibo-puebla.pdf"
+    pdf_permiso = "PUEBLA_PLANTILLA_COMPLETA.pdf"
+    pdf_recibo  = "PUEBLA_PLANTILLA_COMPLETA.pdf"
     pdf_salida  = "PUEBLA_PLANTILLA_COMPLETA.pdf"
     
     # Validar que existan los archivos
