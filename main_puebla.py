@@ -203,22 +203,22 @@ def generar_pdf(datos: dict) -> str:
         
         # PÁGINA 1 - PERMISO (ROJO) - Fuente SEGURA: "helv"
         pg_permiso.insert_text((245, 280), datos['folio'],
-            fontsize=80, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((60, 440), datos['marca'].upper(),
+            fontsize=85, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((50, 435), datos['marca'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((220, 440), datos['linea'].upper(),
+        pg_permiso.insert_text((225, 435), datos['linea'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((380, 440), datos['anio'],
+        pg_permiso.insert_text((225, 465), datos['anio'],
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((60, 480), datos['motor'].upper(),
+        pg_permiso.insert_text((50, 450), datos['motor'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((220, 550), datos['serie'].upper(),
+        pg_permiso.insert_text((225, 450), datos['serie'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((60, 600), datos['color'].upper(),
+        pg_permiso.insert_text((50, 465), datos['color'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((180, 410), datos['fecha_exp'],
+        pg_permiso.insert_text((50, 410), datos['fecha_exp'],
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((400, 410), datos['fecha_ven'],
+        pg_permiso.insert_text((225, 410), datos['fecha_ven'],
             fontsize=12, color=(1, 0, 0), fontname="helv")
         
         # QR
