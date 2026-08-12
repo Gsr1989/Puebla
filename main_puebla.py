@@ -443,157 +443,522 @@ async def login_get(request: Request):
     return HTMLResponse(f"""
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
+
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Acceso Administrativo</title>
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+
+<title>
+    Acceso administrativo
+</title>
+
+<link
+    rel="icon"
+    href="https://smt.puebla.gob.mx/templates/puebla/favicon.ico"
+    type="image/vnd.microsoft.icon"
+>
 
 <style>
+
+:root {{
+    --vino:#5f1b2d;
+    --azul:#001B4C;
+    --dorado:#c79b66;
+    --gris:#949494;
+}}
+
 * {{
-    box-sizing: border-box;
+    box-sizing:border-box;
+}}
+
+html,
+body {{
+    margin:0;
+    min-height:100%;
 }}
 
 body {{
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    background: linear-gradient(135deg,#5f1b2d,#001B4C);
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background:
+        linear-gradient(
+            135deg,
+            #5f1b2d,
+            #001B4C
+        );
 }}
 
-.login {{
-    width: 100%;
-    max-width: 420px;
-    background: white;
-    padding: 38px;
-    border-radius: 20px;
-    box-shadow: 0 18px 60px rgba(0,0,0,.28);
+
+/* ================================
+   HEADER
+================================ */
+
+.header {{
+    background:white;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0,0,0,.10);
 }}
 
-h1 {{
-    margin: 0 0 8px;
-    text-align: center;
-    color: #001B4C;
-    font-size: 1.7rem;
+.header-inner {{
+    max-width:1380px;
+
+    margin:auto;
+
+    padding:
+        18px 30px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:
+        space-between;
+
+    gap:30px;
 }}
 
-.sub {{
-    text-align: center;
-    color: #888;
-    margin-bottom: 28px;
+.logos {{
+    display:flex;
+
+    align-items:center;
+
+    gap:22px;
 }}
 
-.group {{
-    margin-bottom: 18px;
+.logo-gob {{
+    width:245px;
+
+    max-height:82px;
+
+    object-fit:contain;
+}}
+
+.logo-secretaria {{
+    width:225px;
+
+    max-height:88px;
+
+    object-fit:contain;
+}}
+
+.frase {{
+    width:300px;
+
+    max-height:90px;
+
+    object-fit:contain;
+}}
+
+
+/* ================================
+   BARRA
+================================ */
+
+.barra {{
+    height:14px;
+
+    background:
+        var(--vino);
+}}
+
+
+/* ================================
+   LOGIN
+================================ */
+
+.login-area {{
+    min-height:
+        calc(100vh - 130px);
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    padding:
+        55px 20px;
+}}
+
+.card {{
+    width:100%;
+
+    max-width:520px;
+
+    background:white;
+
+    padding:
+        46px 44px;
+
+    border-radius:24px;
+
+    box-shadow:
+        0 18px 60px
+        rgba(0,0,0,.26);
+}}
+
+.card h1 {{
+    margin:
+        0 0 8px;
+
+    text-align:center;
+
+    color:
+        var(--azul);
+
+    font-size:
+        34px;
+
+    font-weight:
+        400;
+}}
+
+.subtitulo {{
+    text-align:center;
+
+    color:
+        var(--gris);
+
+    font-size:
+        18px;
+
+    margin-bottom:
+        34px;
 }}
 
 label {{
-    display: block;
-    margin-bottom: 7px;
-    color: #555;
-    font-weight: 600;
+    display:block;
+
+    margin:
+        18px 0
+        8px;
+
+    font-size:
+        17px;
+
+    font-weight:
+        600;
+
+    color:
+        #555;
 }}
 
 input {{
-    width: 100%;
-    padding: 13px 14px;
-    border: 1px solid #ddd;
-    border-radius: 9px;
-    font-size: 1rem;
+    width:100%;
+
+    padding:
+        14px 16px;
+
+    border:
+        1px solid
+        #d5d5d5;
+
+    border-radius:
+        10px;
+
+    font-size:
+        17px;
+
+    outline:none;
 }}
 
 input:focus {{
-    outline: none;
-    border-color: #c79b66;
-    box-shadow: 0 0 0 3px rgba(199,155,102,.15);
+    border-color:
+        var(--dorado);
+
+    box-shadow:
+        0 0 0
+        3px
+        rgba(199,155,102,.16);
 }}
 
 button {{
-    width: 100%;
-    padding: 13px;
-    border: 0;
-    border-radius: 9px;
-    background: #c79b66;
-    color: white;
-    font-size: 1rem;
-    font-weight: 700;
-    cursor: pointer;
+    width:100%;
+
+    margin-top:
+        26px;
+
+    padding:
+        14px;
+
+    border:0;
+
+    border-radius:
+        10px;
+
+    background:
+        var(--dorado);
+
+    color:white;
+
+    font-size:
+        18px;
+
+    font-weight:
+        700;
+
+    cursor:pointer;
 }}
 
 button:hover {{
-    background: #b8894e;
-}}
-
-.error {{
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f0afb5;
-    padding: 11px;
-    border-radius: 8px;
-    margin-bottom: 18px;
-    text-align: center;
+    background:
+        #b8894e;
 }}
 
 .volver {{
-    margin-top: 20px;
-    text-align: center;
+    text-align:center;
+
+    margin-top:
+        24px;
 }}
 
 .volver a {{
-    color: #001B4C;
-    text-decoration: none;
+    color:
+        var(--azul);
+
+    text-decoration:none;
+
+    font-size:
+        16px;
 }}
+
+.error {{
+    background:
+        #f8d7da;
+
+    color:
+        #721c24;
+
+    border:
+        1px solid
+        #e7abb1;
+
+    border-radius:
+        9px;
+
+    padding:
+        12px;
+
+    margin-bottom:
+        20px;
+
+    text-align:center;
+
+    font-size:
+        14px;
+}}
+
+
+/* ================================
+   CELULAR
+================================ */
+
+@media
+(max-width:700px) {{
+
+    .header-inner {{
+        padding:
+            14px 15px;
+
+        gap:
+            10px;
+    }}
+
+    .logos {{
+        gap:
+            8px;
+
+        flex:1;
+    }}
+
+    .logo-gob {{
+        width:
+            52%;
+    }}
+
+    .logo-secretaria {{
+        width:
+            46%;
+    }}
+
+    .frase {{
+        display:none;
+    }}
+
+    .login-area {{
+        padding:
+            40px 18px;
+    }}
+
+    .card {{
+        padding:
+            38px 30px;
+
+        border-radius:
+            20px;
+    }}
+
+    .card h1 {{
+        font-size:
+            29px;
+    }}
+
+    .subtitulo {{
+        font-size:
+            16px;
+    }}
+}}
+
 </style>
+
 </head>
+
 
 <body>
 
-<div class="login">
 
-    <h1>Panel Administrativo</h1>
+<header class="header">
 
-    <div class="sub">
-        Sistema Puebla
+    <div class="header-inner">
+
+        <div class="logos">
+
+            <a
+                href="https://puebla.gob.mx/"
+                target="_blank"
+                rel="noopener"
+            >
+
+                <img
+                    class="logo-gob"
+
+                    src="
+https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg
+                    "
+
+                    alt="
+Gobierno del Estado de Puebla
+                    "
+                >
+
+            </a>
+
+
+            <img
+                class="logo-secretaria"
+
+                src="
+https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png
+                "
+
+                alt="
+Secretaría de Movilidad y Transporte
+                "
+            >
+
+        </div>
+
+
+        <img
+            class="frase"
+
+            src="
+https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg
+            "
+
+            alt="Puebla"
+        >
+
     </div>
 
-    {error_html}
+</header>
 
-    <form method="post">
 
-        <div class="group">
-            <label>Usuario</label>
+<div class="barra"></div>
+
+
+<main class="login-area">
+
+    <div class="card">
+
+        <h1>
+            Panel Administrativo
+        </h1>
+
+        <div class="subtitulo">
+            Sistema Puebla
+        </div>
+
+
+        {error_html}
+
+
+        <form
+            method="post"
+            action="/login"
+        >
+
+            <label
+                for="username"
+            >
+                Usuario
+            </label>
+
             <input
+                id="username"
                 type="text"
                 name="username"
                 autocomplete="username"
                 required
             >
-        </div>
 
-        <div class="group">
-            <label>Contraseña</label>
+
+            <label
+                for="password"
+            >
+                Contraseña
+            </label>
+
             <input
+                id="password"
                 type="password"
                 name="password"
                 autocomplete="current-password"
                 required
             >
+
+
+            <button
+                type="submit"
+            >
+                Ingresar
+            </button>
+
+        </form>
+
+
+        <div class="volver">
+
+            <a href="/">
+                ← Volver
+            </a>
+
         </div>
 
-        <button type="submit">
-            Ingresar
-        </button>
-
-    </form>
-
-    <div class="volver">
-        <a href="/">← Volver</a>
     </div>
 
-</div>
+</main>
+
 
 </body>
 </html>
