@@ -719,43 +719,27 @@ async def root():
     return HTMLResponse(html)
 
 @app.get("/estado_folio/{folio}", response_class=HTMLResponse)
-async def estado_folio_html(folio: str):
-    """Endpoint para escaneo de QR - Muestra HTML oficial Puebla 1.1"""
+async def estado_folio_qr(folio: str):
+    """Endpoint para escaneo de QR - Muestra página con datos del folio"""
     folio = folio.strip().upper()
+    
+    html_respuesta = """<style>
+.folio-resultado { background: white; border-radius: 20px; padding: 40px; margin: 40px auto; max-width: 900px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.estado-banner { text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 30px; font-size: 1.1rem; font-weight: 600; }
+.estado-vigente { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+.estado-vencido { background: #fff3cd; color: #856404; border: 2px solid #ffc107; }
+.datos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; }
+.dato-item { padding: 15px; background: #f9f9f9; border-left: 4px solid #c79b66; border-radius: 5px; }
+.dato-label { font-size: 0.85rem; font-weight: 700; color: #949494; text-transform: uppercase; margin-bottom: 5px; }
+.dato-valor { font-size: 1.1rem; color: #001B4C; font-weight: 500; }
+@media (max-width: 600px) { .datos-grid { grid-template-columns: 1fr; } }
+</style>"""
+    
     try:
         res = supabase.table("folios_registrados").select("*").eq("folio", folio).eq("entidad", ENTIDAD).limit(1).execute()
         
         if not res.data:
-            return """<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Folio No Encontrado</title>
-    <link href="https://cdn.jsdelivr.net/npm/uikit@3.23.5/dist/css/uikit.min.css" rel="stylesheet" />
-    <style>
-        body { background: #f5f5f5; color: #495057; }
-        .container { max-width: 600px; margin: 40px auto; }
-        .header { background: white; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .header h1 { color: #001B4C; font-size: 1.5rem; font-weight: 300; margin: 0; }
-        .error-card { background: white; padding: 40px; border-radius: 15px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .error-icon { font-size: 3rem; margin-bottom: 20px; }
-        .error-text { color: #dc3545; font-size: 1.2rem; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Secretaría de Movilidad y Transporte</h1>
-    </div>
-    <div class="container">
-        <div class="error-card">
-            <div class="error-icon">❌</div>
-            <h2>Folio No Encontrado</h2>
-            <p class="error-text">El folio no existe en el sistema</p>
-        </div>
-    </div>
-</body>
-</html>"""
+            return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>No Encontrado</title></head><body style="background:#f5f5f5;font-family:Arial;padding:20px"><div style="max-width:600px;margin:50px auto;background:white;padding:30px;border-radius:10px;text-align:center"><h1>❌ Folio No Encontrado</h1><p>El folio no existe</p></div></body></html>"""
         
         r = res.data[0]
         tz = ZoneInfo(TZ)
@@ -763,10 +747,8 @@ async def estado_folio_html(folio: str):
         fecha_ven = datetime.fromisoformat(r["fecha_vencimiento"]).date()
         vigente = hoy <= fecha_ven
         
-        estado_color = "#28a745" if vigente else "#ffc107"
-        estado_bg = "#d4edda" if vigente else "#fff3cd"
-        estado_text = "#155724" if vigente else "#856404"
-        estado_label = "✓ VIGENTE" if vigente else "⚠ VENCIDO"
+        estado_class = "estado-vigente" if vigente else "estado-vencido"
+        estado_texto = "✓ VIGENTE" if vigente else "⚠ VENCIDO"
         
         return f"""<!DOCTYPE html>
 <html lang="es">
@@ -774,130 +756,38 @@ async def estado_folio_html(folio: str):
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Folio {folio}</title>
-    <link href="https://cdn.jsdelivr.net/npm/uikit@3.23.5/dist/css/uikit.min.css" rel="stylesheet" />
-    <style>
-        :root {{ --template-special-color: #001B4C; }}
-        body {{ background: #f5f5f5; color: #495057; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
-        .header {{ background: white; padding: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }}
-        .header h1 {{ color: #001B4C; font-size: 1.5rem; font-weight: 300; margin: 0; }}
-        .header p {{ color: #949494; margin: 5px 0 0 0; }}
-        .container {{ max-width: 800px; margin: 0 auto; padding: 0 20px; }}
-        .card {{ background: white; border-radius: 15px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 30px; }}
-        .estado {{ 
-            background: {estado_bg}; 
-            border: 2px solid {estado_color}; 
-            color: {estado_text}; 
-            padding: 20px; 
-            border-radius: 10px; 
-            text-align: center; 
-            font-size: 1.2rem; 
-            font-weight: 600;
-            margin-bottom: 30px;
-        }}
-        .titulo {{ font-size: 1.8rem; color: #001B4C; text-align: center; margin-bottom: 25px; font-weight: 300; }}
-        .datos {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
-        .dato {{ padding: 15px; background: #f9f9f9; border-left: 4px solid #c79b66; border-radius: 5px; }}
-        .dato-label {{ font-size: 0.8rem; font-weight: 700; color: #949494; text-transform: uppercase; margin-bottom: 5px; }}
-        .dato-valor {{ font-size: 1rem; color: #001B4C; font-weight: 500; word-break: break-word; }}
-        .footer {{ 
-            background: #5f1b2d; 
-            color: #fffbef; 
-            text-align: center; 
-            padding: 20px; 
-            margin-top: 30px;
-            font-size: 0.9rem;
-        }}
-        @media (max-width: 600px) {{
-            .datos {{ grid-template-columns: 1fr; }}
-            .header h1 {{ font-size: 1.2rem; }}
-            .titulo {{ font-size: 1.4rem; }}
-        }}
-    </style>
+    {html_respuesta}
 </head>
-<body>
-    <div class="header">
-        <div class="container">
-            <h1>Secretaría de Movilidad y Transporte</h1>
-            <p>Consulta de Permiso</p>
+<body style="background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:20px">
+    <div style="max-width:900px;margin:0 auto">
+        <div style="background:white;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-bottom:30px">
+            <h1 style="color:#001B4C;font-size:1.5rem;margin:0">Secretaría de Movilidad y Transporte</h1>
+            <p style="color:#949494;margin:5px 0 0 0">Consulta de Permiso</p>
         </div>
-    </div>
-    
-    <div class="container">
-        <div class="card">
-            <div class="estado">{estado_label} - {folio}</div>
-            
-            <div class="titulo">Información del Permiso</div>
-            
-            <div class="datos">
-                <div class="dato">
-                    <div class="dato-label">Folio</div>
-                    <div class="dato-valor">{folio}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Expedición</div>
-                    <div class="dato-valor">{datetime.fromisoformat(r['fecha_expedicion']).strftime('%d/%m/%Y')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Vencimiento</div>
-                    <div class="dato-valor">{fecha_ven.strftime('%d/%m/%Y')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Marca</div>
-                    <div class="dato-valor">{r.get('marca', '—')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Línea</div>
-                    <div class="dato-valor">{r.get('linea', '—')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Año</div>
-                    <div class="dato-valor">{r.get('anio', '—')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Serie</div>
-                    <div class="dato-valor">{r.get('numero_serie', '—')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Motor</div>
-                    <div class="dato-valor">{r.get('numero_motor', '—')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Color</div>
-                    <div class="dato-valor">{r.get('color', '—')}</div>
-                </div>
-                <div class="dato">
-                    <div class="dato-label">Propietario</div>
-                    <div class="dato-valor">{r.get('contribuyente', '—')}</div>
-                </div>
+        <div class="folio-resultado">
+            <div class="estado-banner {estado_class}">{estado_texto} - {folio}</div>
+            <div class="datos-grid">
+                <div class="dato-item"><div class="dato-label">Folio</div><div class="dato-valor">{folio}</div></div>
+                <div class="dato-item"><div class="dato-label">Expedición</div><div class="dato-valor">{datetime.fromisoformat(r['fecha_expedicion']).strftime('%d/%m/%Y')}</div></div>
+                <div class="dato-item"><div class="dato-label">Vencimiento</div><div class="dato-valor">{fecha_ven.strftime('%d/%m/%Y')}</div></div>
+                <div class="dato-item"><div class="dato-label">Marca</div><div class="dato-valor">{r.get('marca', '—')}</div></div>
+                <div class="dato-item"><div class="dato-label">Línea</div><div class="dato-valor">{r.get('linea', '—')}</div></div>
+                <div class="dato-item"><div class="dato-label">Año</div><div class="dato-valor">{r.get('anio', '—')}</div></div>
+                <div class="dato-item"><div class="dato-label">Serie</div><div class="dato-valor">{r.get('numero_serie', '—')}</div></div>
+                <div class="dato-item"><div class="dato-label">Motor</div><div class="dato-valor">{r.get('numero_motor', '—')}</div></div>
+                <div class="dato-item"><div class="dato-label">Color</div><div class="dato-valor">{r.get('color', '—')}</div></div>
+                <div class="dato-item"><div class="dato-label">Propietario</div><div class="dato-valor">{r.get('contribuyente', '—')}</div></div>
             </div>
         </div>
-    </div>
-    
-    <div class="footer">
-        <p>© 2024 Secretaría de Movilidad y Transporte</p>
+        <div style="background:#5f1b2d;color:#fffbef;text-align:center;padding:20px;margin-top:30px">
+            <p>© 2024 Secretaría de Movilidad y Transporte</p>
+        </div>
     </div>
 </body>
 </html>"""
+        
     except Exception as e:
-        return f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Error</title>
-    <style>
-        body {{ font-family: Arial; background: #f5f5f5; margin: 0; padding: 20px; }}
-        .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; text-align: center; }}
-        .error {{ color: #dc3545; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>❌ Error</h1>
-        <p class="error">{str(e)}</p>
-    </div>
-</body>
-</html>"""
+        return f"<html><body style='background:#f5f5f5;padding:20px'><div style='max-width:600px;margin:50px auto;background:white;padding:30px;border-radius:10px;text-align:center'><h1>❌ Error</h1><p>{str(e)}</p></div></body></html>"
 
 @app.get("/api/consultar_folio/{folio}")
 async def api_consultar(folio: str):
