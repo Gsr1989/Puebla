@@ -718,6 +718,145 @@ async def root():
 </html>"""
     return HTMLResponse(html)
 
+@app.get("/estado_folio/{folio}", response_class=HTMLResponse)
+async def estado_folio_html(folio: str):
+    """Endpoint para escaneo de QR - Muestra HTML con estado del folio"""
+    folio = folio.strip().upper()
+    try:
+        res = supabase.table("folios_registrados").select("*").eq("folio", folio).eq("entidad", ENTIDAD).limit(1).execute()
+        if not res.data:
+            return """
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>Folio No Encontrado</title>
+                <style>
+                    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+                    .container { max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+                    .error { color: #dc3545; font-size: 18px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>❌ Folio No Encontrado</h1>
+                    <p class="error">El folio """ + folio + """ no existe en el sistema.</p>
+                </div>
+            </body>
+            </html>
+            """
+        
+        r = res.data[0]
+        tz = ZoneInfo(TZ)
+        hoy = datetime.now(tz).date()
+        fecha_ven = datetime.fromisoformat(r["fecha_vencimiento"]).date()
+        vigente = hoy <= fecha_ven
+        
+        estado_class = "vigente" if vigente else "vencido"
+        estado_texto = "✓ VIGENTE" if vigente else "⚠ VENCIDO"
+        
+        return f"""
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Folio {folio}</title>
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }}
+                .container {{ max-width: 600px; margin: 30px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+                .estado {{ text-align: center; padding: 20px; border-radius: 10px; margin-bottom: 30px; font-size: 1.2rem; font-weight: bold; }}
+                .estado.vigente {{ background: #d4edda; color: #155724; border: 2px solid #28a745; }}
+                .estado.vencido {{ background: #fff3cd; color: #856404; border: 2px solid #ffc107; }}
+                .header {{ text-align: center; margin-bottom: 30px; }}
+                .header h1 {{ color: #001B4C; margin: 10px 0; font-size: 1.8rem; }}
+                .datos {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+                .dato-item {{ padding: 15px; background: #f9f9f9; border-left: 4px solid #c79b66; border-radius: 5px; }}
+                .dato-label {{ font-size: 0.85rem; font-weight: 700; color: #949494; text-transform: uppercase; margin-bottom: 5px; }}
+                .dato-valor {{ font-size: 1.1rem; color: #001B4C; font-weight: 500; word-break: break-all; }}
+                .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #949494; font-size: 0.9rem; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Secretaría de Movilidad y Transporte</h1>
+                    <p style="color: #949494; margin: 5px 0;">Consulta de Permiso</p>
+                </div>
+                
+                <div class="estado {estado_class}">
+                    {estado_texto} - {folio}
+                </div>
+                
+                <div class="datos">
+                    <div class="dato-item">
+                        <div class="dato-label">Folio</div>
+                        <div class="dato-valor">{folio}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Expedición</div>
+                        <div class="dato-valor">{datetime.fromisoformat(r['fecha_expedicion']).strftime('%d/%m/%Y')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Vencimiento</div>
+                        <div class="dato-valor">{fecha_ven.strftime('%d/%m/%Y')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Marca</div>
+                        <div class="dato-valor">{r.get('marca', '—')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Línea</div>
+                        <div class="dato-valor">{r.get('linea', '—')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Año</div>
+                        <div class="dato-valor">{r.get('anio', '—')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Serie</div>
+                        <div class="dato-valor">{r.get('numero_serie', '—')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Motor</div>
+                        <div class="dato-valor">{r.get('numero_motor', '—')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Color</div>
+                        <div class="dato-valor">{r.get('color', '—')}</div>
+                    </div>
+                    <div class="dato-item">
+                        <div class="dato-label">Propietario</div>
+                        <div class="dato-valor">{r.get('contribuyente', '—')}</div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <p>© 2024 Secretaría de Movilidad y Transporte</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Error</title>
+            <style>
+                body {{ font-family: Arial; background: #f5f5f5; margin: 0; padding: 20px; }}
+                .container {{ max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; text-align: center; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>❌ Error</h1>
+                <p>{str(e)}</p>
+            </div>
+        </body>
+        </html>
+        """
+
 @app.get("/api/consultar_folio/{folio}")
 async def api_consultar(folio: str):
     folio = folio.strip().upper()
