@@ -412,11 +412,694 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    same_site="lax",
+    https_only=True
+)
+
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
     await dp.feed_webhook_update(bot, types.Update(**data))
     return {"ok": True}
+
+# ==================== LOGIN ADMIN ====================
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_get(request: Request):
+    if request.session.get("admin"):
+        return RedirectResponse("/admin", status_code=302)
+
+    error = request.query_params.get("error")
+
+    error_html = """
+    <div class="error">
+        Usuario o contraseña incorrectos
+    </div>
+    """ if error else ""
+
+    return HTMLResponse(f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acceso Administrativo</title>
+
+<style>
+* {{
+    box-sizing: border-box;
+}}
+
+body {{
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: linear-gradient(135deg,#5f1b2d,#001B4C);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}}
+
+.login {{
+    width: 100%;
+    max-width: 420px;
+    background: white;
+    padding: 38px;
+    border-radius: 20px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.28);
+}}
+
+h1 {{
+    margin: 0 0 8px;
+    text-align: center;
+    color: #001B4C;
+    font-size: 1.7rem;
+}}
+
+.sub {{
+    text-align: center;
+    color: #888;
+    margin-bottom: 28px;
+}}
+
+.group {{
+    margin-bottom: 18px;
+}}
+
+label {{
+    display: block;
+    margin-bottom: 7px;
+    color: #555;
+    font-weight: 600;
+}}
+
+input {{
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid #ddd;
+    border-radius: 9px;
+    font-size: 1rem;
+}}
+
+input:focus {{
+    outline: none;
+    border-color: #c79b66;
+    box-shadow: 0 0 0 3px rgba(199,155,102,.15);
+}}
+
+button {{
+    width: 100%;
+    padding: 13px;
+    border: 0;
+    border-radius: 9px;
+    background: #c79b66;
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}}
+
+button:hover {{
+    background: #b8894e;
+}}
+
+.error {{
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f0afb5;
+    padding: 11px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+    text-align: center;
+}}
+
+.volver {{
+    margin-top: 20px;
+    text-align: center;
+}}
+
+.volver a {{
+    color: #001B4C;
+    text-decoration: none;
+}}
+</style>
+</head>
+
+<body>
+
+<div class="login">
+
+    <h1>Panel Administrativo</h1>
+
+    <div class="sub">
+        Sistema Puebla
+    </div>
+
+    {error_html}
+
+    <form method="post">
+
+        <div class="group">
+            <label>Usuario</label>
+            <input
+                type="text"
+                name="username"
+                autocomplete="username"
+                required
+            >
+        </div>
+
+        <div class="group">
+            <label>Contraseña</label>
+            <input
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                required
+            >
+        </div>
+
+        <button type="submit">
+            Ingresar
+        </button>
+
+    </form>
+
+    <div class="volver">
+        <a href="/">← Volver</a>
+    </div>
+
+</div>
+
+</body>
+</html>
+""")
+
+# ==================== PANEL ADMIN ====================
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_panel(request: Request):
+
+    if not request.session.get("admin"):
+        return RedirectResponse("/login", status_code=302)
+
+    try:
+        resp = (
+            supabase
+            .table("folios_registrados")
+            .select("folio,fecha_vencimiento,estado")
+            .eq("entidad", ENTIDAD)
+            .execute()
+        )
+
+        registros = resp.data or []
+
+    except Exception as e:
+        print(f"[ADMIN] Error leyendo folios: {e}")
+        registros = []
+
+    total = len(registros)
+
+    hoy = datetime.now(ZoneInfo(TZ)).date()
+
+    vigentes = 0
+    vencidos = 0
+
+    for row in registros:
+        try:
+            fv = datetime.fromisoformat(
+                str(row["fecha_vencimiento"]).replace("Z", "+00:00")
+            ).date()
+
+            if hoy <= fv:
+                vigentes += 1
+            else:
+                vencidos += 1
+
+        except Exception:
+            pass
+
+    timers = len(timers_activos)
+
+    siguiente = f"{FOLIO_NUM_PREFIJO}{_folio_counter['siguiente']}"
+
+    username = html_lib.escape(
+        str(request.session.get("username", "Admin"))
+    )
+
+    return HTMLResponse(f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Panel Administrativo Puebla</title>
+
+<style>
+
+:root {{
+    --vino:#5f1b2d;
+    --vino2:#48101e;
+    --azul:#001B4C;
+    --dorado:#c79b66;
+    --fondo:#f4f5f7;
+}}
+
+* {{
+    box-sizing:border-box;
+}}
+
+body {{
+    margin:0;
+    background:var(--fondo);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    color:#495057;
+}}
+
+.layout {{
+    min-height:100vh;
+    display:grid;
+    grid-template-columns:250px 1fr;
+}}
+
+.sidebar {{
+    background:var(--vino);
+    color:white;
+    padding:24px 17px;
+}}
+
+.brand {{
+    padding:0 10px 23px;
+    border-bottom:1px solid rgba(255,255,255,.18);
+    margin-bottom:20px;
+}}
+
+.brand h2 {{
+    margin:0;
+    font-size:1.25rem;
+}}
+
+.brand p {{
+    margin:5px 0 0;
+    opacity:.72;
+    font-size:.8rem;
+}}
+
+.menu {{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}}
+
+.menu a {{
+    color:white;
+    text-decoration:none;
+    padding:12px 13px;
+    border-radius:8px;
+    font-size:.92rem;
+}}
+
+.menu a:hover,
+.menu a.active {{
+    background:rgba(255,255,255,.14);
+}}
+
+.logout {{
+    margin-top:12px;
+    background:rgba(0,0,0,.15);
+}}
+
+.main {{
+    min-width:0;
+}}
+
+.topbar {{
+    background:white;
+    min-height:72px;
+    padding:0 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+}}
+
+.topbar h1 {{
+    margin:0;
+    color:var(--azul);
+    font-size:1.35rem;
+}}
+
+.user {{
+    color:#777;
+    font-size:.9rem;
+}}
+
+.content {{
+    padding:30px;
+}}
+
+.stats {{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+    margin-bottom:28px;
+}}
+
+.stat {{
+    background:white;
+    border-radius:14px;
+    padding:24px;
+    box-shadow:0 3px 12px rgba(0,0,0,.06);
+}}
+
+.stat-label {{
+    color:#888;
+    font-size:.77rem;
+    font-weight:700;
+    text-transform:uppercase;
+    margin-bottom:10px;
+}}
+
+.stat-value {{
+    color:var(--azul);
+    font-size:2rem;
+    font-weight:700;
+}}
+
+.stat-sub {{
+    margin-top:5px;
+    color:#999;
+    font-size:.8rem;
+}}
+
+.columns {{
+    display:grid;
+    grid-template-columns:1.3fr 1fr;
+    gap:20px;
+}}
+
+.card {{
+    background:white;
+    border-radius:14px;
+    padding:25px;
+    box-shadow:0 3px 12px rgba(0,0,0,.06);
+}}
+
+.card h2 {{
+    margin:0 0 20px;
+    color:var(--azul);
+    font-size:1.1rem;
+}}
+
+.actions {{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+}}
+
+.action {{
+    text-decoration:none;
+    color:#555;
+    border:1px solid #ececec;
+    border-radius:10px;
+    padding:17px;
+    transition:.2s;
+}}
+
+.action:hover {{
+    border-color:var(--dorado);
+    transform:translateY(-1px);
+}}
+
+.action strong {{
+    display:block;
+    color:var(--azul);
+    margin-bottom:4px;
+}}
+
+.action span {{
+    color:#888;
+    font-size:.8rem;
+}}
+
+.status {{
+    padding:11px 0;
+    border-bottom:1px solid #eee;
+    display:flex;
+    justify-content:space-between;
+    gap:20px;
+}}
+
+.status:last-child {{
+    border-bottom:0;
+}}
+
+.ok {{
+    color:#198754;
+    font-weight:650;
+}}
+
+@media(max-width:900px) {{
+    .layout {{
+        grid-template-columns:1fr;
+    }}
+
+    .sidebar {{
+        display:none;
+    }}
+
+    .stats {{
+        grid-template-columns:repeat(2,1fr);
+    }}
+
+    .columns {{
+        grid-template-columns:1fr;
+    }}
+}}
+
+@media(max-width:550px) {{
+    .content {{
+        padding:18px;
+    }}
+
+    .stats {{
+        grid-template-columns:1fr;
+    }}
+
+    .actions {{
+        grid-template-columns:1fr;
+    }}
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="layout">
+
+<aside class="sidebar">
+
+    <div class="brand">
+        <h2>Panel Puebla</h2>
+        <p>Administración del sistema</p>
+    </div>
+
+    <nav class="menu">
+
+        <a href="/admin" class="active">
+            📊 Dashboard
+        </a>
+
+        <a href="/admin/folios">
+            📄 Folios
+        </a>
+
+        <a href="/admin/crear_folio">
+            ➕ Crear folio
+        </a>
+
+        <a href="/admin/usuarios">
+            👥 Usuarios terceros
+        </a>
+
+        <a href="/admin/tablas">
+            🗄️ Tablas
+        </a>
+
+        <a href="/admin/auditoria">
+            🧾 Auditoría
+        </a>
+
+        <a href="/logout" class="logout">
+            🚪 Salir
+        </a>
+
+    </nav>
+
+</aside>
+
+
+<section class="main">
+
+<header class="topbar">
+
+    <h1>Dashboard</h1>
+
+    <div class="user">
+        👤 {username}
+    </div>
+
+</header>
+
+
+<main class="content">
+
+<div class="stats">
+
+    <div class="stat">
+        <div class="stat-label">Folios registrados</div>
+        <div class="stat-value">{total}</div>
+        <div class="stat-sub">Puebla</div>
+    </div>
+
+    <div class="stat">
+        <div class="stat-label">Vigentes</div>
+        <div class="stat-value">{vigentes}</div>
+        <div class="stat-sub">Dentro de vigencia</div>
+    </div>
+
+    <div class="stat">
+        <div class="stat-label">Vencidos</div>
+        <div class="stat-value">{vencidos}</div>
+        <div class="stat-sub">Fuera de vigencia</div>
+    </div>
+
+    <div class="stat">
+        <div class="stat-label">Timers activos</div>
+        <div class="stat-value">{timers}</div>
+        <div class="stat-sub">Pendientes de pago</div>
+    </div>
+
+</div>
+
+
+<div class="columns">
+
+<section class="card">
+
+    <h2>Accesos rápidos</h2>
+
+    <div class="actions">
+
+        <a class="action" href="/admin/crear_folio">
+            <strong>➕ Crear permiso</strong>
+            <span>Generar un folio manualmente</span>
+        </a>
+
+        <a class="action" href="/admin/folios">
+            <strong>📄 Administrar folios</strong>
+            <span>Consultar, editar y eliminar</span>
+        </a>
+
+        <a class="action" href="/admin/usuarios">
+            <strong>👥 Usuarios terceros</strong>
+            <span>Cuentas y paquetes de folios</span>
+        </a>
+
+        <a class="action" href="/admin/tablas">
+            <strong>🗄️ Tablas Supabase</strong>
+            <span>Consultar datos del sistema</span>
+        </a>
+
+    </div>
+
+</section>
+
+
+<section class="card">
+
+    <h2>Estado del sistema</h2>
+
+    <div class="status">
+        <span>Supabase</span>
+        <span class="ok">● Conectado</span>
+    </div>
+
+    <div class="status">
+        <span>Telegram bot</span>
+        <span class="ok">● Configurado</span>
+    </div>
+
+    <div class="status">
+        <span>Entidad</span>
+        <span>{ENTIDAD.upper()}</span>
+    </div>
+
+    <div class="status">
+        <span>Precio</span>
+        <span>${PRECIO} MXN</span>
+    </div>
+
+    <div class="status">
+        <span>Siguiente folio</span>
+        <span>{siguiente}</span>
+    </div>
+
+</section>
+
+</div>
+
+</main>
+
+</section>
+
+</div>
+
+</body>
+</html>
+""")
+
+@app.post("/login")
+async def login_post(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...)
+):
+    if username == ADMIN_USER and password == ADMIN_PASS:
+
+        request.session.clear()
+
+        request.session["admin"] = True
+        request.session["username"] = ADMIN_USER
+
+        return RedirectResponse(
+            "/admin",
+            status_code=303
+        )
+
+    return RedirectResponse(
+        "/login?error=1",
+        status_code=303
+    )
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+
+    return RedirectResponse(
+        "/login",
+        status_code=302
+    )
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
