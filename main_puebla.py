@@ -24,7 +24,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 BASE_URL     = "https://smt-puebla-gob-mx.onrender.com"
 OUTPUT_DIR   = "documentos"
-PLANTILLA    = "PUEBLA_PLANTILLA_COMPLETA.pdf"  # ← UN SOLO NOMBRE
+PLANTILLA    = "PUEBLA_PLANTILLA_COMPLETA.pdf"
 ENTIDAD      = "puebla"
 PRECIO       = 180
 TZ           = "America/Mexico_City"
@@ -400,7 +400,6 @@ async def lifespan(app: FastAPI):
     await bot.session.close()
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key="puebla-secret")
 
 @app.post("/webhook")
 async def webhook(request: Request):
