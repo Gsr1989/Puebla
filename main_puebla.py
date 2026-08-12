@@ -2564,7 +2564,7 @@ async def root():
 
         .header {
             background: #fff;
-            box-shadow: 0 2px 7px rgba(0,0,0,.10);
+            box-shadow: 0 2px 7px rgba(0,0,0,0.1);
             flex-shrink: 0;
         }
 
