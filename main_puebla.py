@@ -413,53 +413,206 @@ async def root():
     <style>
         :root { --template-special-color: #001B4C; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif; background: #f5f5f5; color: #495057; }
-        .header { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px 0; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
-        .logo-section { display: flex; align-items: center; gap: 15px; }
-        .logo-section img { height: 60px; }
-        .header h1 { font-size: 1.5rem; color: #001B4C; font-weight: 300; margin: 0; }
-        .header p { color: #949494; font-size: 0.9rem; margin: 5px 0 0 0; }
-        .consulta-section { background: white; border-radius: 20px; padding: 40px; margin: 40px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 900px; }
-        .consulta-titulo { font-size: 2rem; color: #001B4C; text-align: center; margin-bottom: 30px; font-weight: 300; }
-        .formulario-consulta { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; margin-bottom: 40px; align-items: flex-end; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-group label { font-size: 0.95rem; font-weight: 600; color: #495057; margin-bottom: 8px; }
-        .form-group input { padding: 12px 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; font-family: inherit; }
-        .form-group input:focus { outline: none; border-color: #001B4C; box-shadow: 0 0 0 3px rgba(0, 27, 76, 0.1); }
-        .btn-consultar { padding: 12px 30px; background: #c79b66; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
-        .btn-consultar:hover { background: #b8894e; }
-        .resultado-container { margin-top: 40px; display: none; }
-        .resultado-container.visible { display: block; }
-        .estado-folio { text-align: center; margin-bottom: 20px; padding: 20px; border-radius: 12px; font-size: 1.1rem; font-weight: 600; }
-        .estado-folio.vigente { background: #d4edda; color: #155724; border: 2px solid #28a745; }
-        .estado-folio.vencido { background: #fff3cd; color: #856404; border: 2px solid #ffc107; }
-        .estado-folio.no-existe { background: #f8d7da; color: #721c24; border: 2px solid #dc3545; }
-        .resultado-tabla { background: #f6f6f6; border-radius: 12px; padding: 30px; margin-top: 20px; }
-        .resultado-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; }
-        .resultado-item { padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #c79b66; }
-        .resultado-label { font-size: 0.85rem; font-weight: 700; color: #949494; text-transform: uppercase; margin-bottom: 5px; }
-        .resultado-valor { font-size: 1.1rem; color: #001B4C; font-weight: 500; }
-        .footer { background: #5f1b2d; color: #fffbef; padding: 40px 0; margin-top: 60px; text-align: center; }
-        .loading { display: none; text-align: center; padding: 20px; }
-        .loading.active { display: block; }
-        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #c79b66; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @media (max-width: 768px) { .formulario-consulta { grid-template-columns: 1fr; } .btn-consultar { width: 100%; } .resultado-grid { grid-template-columns: 1fr; } .header { padding: 15px 0; } .header h1 { font-size: 1.2rem; } }
+        html, body { height: 100%; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+            background: #f5f5f5; 
+            color: #495057;
+            display: flex;
+            flex-direction: column;
+        }
+        .header { 
+            background: white; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 0 20px; 
+        }
+        .header h1 { 
+            font-size: 1.5rem; 
+            color: #001B4C; 
+            font-weight: 300; 
+            margin: 0;
+        }
+        .header p { 
+            color: #949494; 
+            font-size: 0.9rem; 
+            margin: 5px 0 0 0;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        .consulta-section { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 40px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            max-width: 900px;
+            width: 100%;
+        }
+        .consulta-titulo { 
+            font-size: 2rem; 
+            color: #001B4C; 
+            text-align: center; 
+            margin-bottom: 30px; 
+            font-weight: 300;
+        }
+        .formulario-consulta { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr auto; 
+            gap: 15px; 
+            margin-bottom: 40px; 
+            align-items: flex-end;
+        }
+        .form-group { 
+            display: flex; 
+            flex-direction: column;
+        }
+        .form-group label { 
+            font-size: 0.95rem; 
+            font-weight: 600; 
+            color: #495057; 
+            margin-bottom: 8px;
+        }
+        .form-group input { 
+            padding: 12px 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        .form-group input:focus { 
+            outline: none; 
+            border-color: #001B4C; 
+            box-shadow: 0 0 0 3px rgba(0, 27, 76, 0.1);
+        }
+        .btn-consultar { 
+            padding: 12px 30px; 
+            background: #c79b66; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 1rem; 
+            font-weight: 600; 
+            cursor: pointer;
+        }
+        .btn-consultar:hover { 
+            background: #b8894e;
+        }
+        .resultado-container { 
+            margin-top: 40px; 
+            display: none;
+        }
+        .resultado-container.visible { 
+            display: block;
+        }
+        .estado-folio { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            padding: 20px; 
+            border-radius: 12px; 
+            font-size: 1.1rem; 
+            font-weight: 600;
+        }
+        .estado-folio.vigente { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 2px solid #28a745;
+        }
+        .estado-folio.vencido { 
+            background: #fff3cd; 
+            color: #856404; 
+            border: 2px solid #ffc107;
+        }
+        .estado-folio.no-existe { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 2px solid #dc3545;
+        }
+        .resultado-tabla { 
+            background: #f6f6f6; 
+            border-radius: 12px; 
+            padding: 30px; 
+            margin-top: 20px;
+        }
+        .resultado-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px 40px;
+        }
+        .resultado-item { 
+            padding: 15px; 
+            background: white; 
+            border-radius: 8px; 
+            border-left: 4px solid #c79b66;
+        }
+        .resultado-label { 
+            font-size: 0.85rem; 
+            font-weight: 700; 
+            color: #949494; 
+            text-transform: uppercase; 
+            margin-bottom: 5px;
+        }
+        .resultado-valor { 
+            font-size: 1.1rem; 
+            color: #001B4C; 
+            font-weight: 500;
+        }
+        .footer { 
+            background: #5f1b2d; 
+            color: #fffbef; 
+            padding: 40px 0; 
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .loading { 
+            display: none; 
+            text-align: center; 
+            padding: 20px;
+        }
+        .loading.active { 
+            display: block;
+        }
+        .spinner { 
+            border: 3px solid #f3f3f3; 
+            border-top: 3px solid #c79b66; 
+            border-radius: 50%; 
+            width: 40px; 
+            height: 40px; 
+            animation: spin 1s linear infinite; 
+            margin: 0 auto;
+        }
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+        }
+        @media (max-width: 768px) { 
+            .formulario-consulta { grid-template-columns: 1fr; } 
+            .btn-consultar { width: 100%; } 
+            .resultado-grid { grid-template-columns: 1fr; }
+            .header { padding: 15px 0; }
+            .header h1 { font-size: 1.2rem; }
+            .consulta-titulo { font-size: 1.5rem; }
+        }
     </style>
 </head>
 <body>
     <header class="header">
         <div class="container">
-            <div class="logo-section">
-                <div>
-                    <h1>Secretaría de Movilidad y Transporte</h1>
-                    <p>Consulta de Permisos Vehiculares</p>
-                </div>
-            </div>
+            <h1>Secretaría de Movilidad y Transporte</h1>
+            <p>Consulta de Permisos Vehiculares</p>
         </div>
     </header>
-    <div class="container">
+    
+    <div class="main-content">
         <div class="consulta-section">
             <h2 class="consulta-titulo">Consulta de Permisos</h2>
             <form class="formulario-consulta" id="formularioConsulta" onsubmit="buscar(event)">
@@ -502,9 +655,11 @@ async def root():
             </div>
         </div>
     </div>
+    
     <footer class="footer">
         <p>© 2024 Secretaría de Movilidad y Transporte | movilidadytransporte@puebla.gob.mx</p>
     </footer>
+    
     <script>
         async function buscar(e) {
             e.preventDefault();
