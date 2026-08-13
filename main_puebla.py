@@ -232,7 +232,7 @@ def generar_pdf(datos: dict) -> str:
         
         pg_permiso.insert_text((270, 110), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 410), datos['fecha_ven'],
+        pg_permiso.insert_text((425, 610), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # QR - esquina superior izquierda, bajado 20 puntos
