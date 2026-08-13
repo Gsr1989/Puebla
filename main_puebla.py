@@ -208,13 +208,13 @@ def generar_pdf(datos: dict) -> str:
             fontsize=12, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 435), datos['linea'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 465), datos['anio'],
+        pg_permiso.insert_text((225, 495), datos['anio'],
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 450), datos['motor'].upper(),
+        pg_permiso.insert_text((50, 465), datos['motor'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 450), datos['serie'].upper(),
+        pg_permiso.insert_text((225, 465), datos['serie'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 465), datos['color'].upper(),
+        pg_permiso.insert_text((50, 495), datos['color'].upper(),
             fontsize=12, color=(1, 0, 0), fontname="helv")
         pg_permiso.insert_text((50, 410), datos['fecha_exp'],
             fontsize=12, color=(1, 0, 0), fontname="helv")
@@ -230,7 +230,11 @@ def generar_pdf(datos: dict) -> str:
         img_qr.save(buf, format="PNG")
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
-        pg_permiso.insert_image(fitz.Rect(490, 200, 590, 300), pixmap=qr_pix, overlay=True)
+        pg_permiso.insert_image(
+        fitz.Rect(490, 300, 590, 400),
+        pixmap=qr_pix,
+        overlay=True
+        )
         
         # PÁGINA 2 - RECIBO (NEGRO) - Fuente SEGURA: "helv"
         pg_recibo.insert_text((200, 150), "CENTRO INTEGRAL DE SERVICIOS",
