@@ -231,7 +231,7 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-        fitz.Rect(490, 300, 590, 400),
+        fitz.Rect(455, 400, 555, 500),
         pixmap=qr_pix,
         overlay=True
         )
