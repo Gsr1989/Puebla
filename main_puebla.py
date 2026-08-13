@@ -237,12 +237,12 @@ def generar_pdf(datos: dict) -> str:
         )
         
         # PÁGINA 2 - RECIBO (NEGRO) - Fuente SEGURA: "helv"
-        pg_recibo.insert_text((60, 200), datos['fecha_exp'],
-            fontsize=14, color=(0,0,0), fontname="helv")
-        pg_recibo.insert_text((60, 300), datos["nombre"].upper(),
+        pg_recibo.insert_text((60, 100), datos['fecha_exp'],
             fontsize=12, color=(0,0,0), fontname="helv")
-        pg_recibo.insert_text((390, 160), datos['folio'],
-            fontsize=64, color=(0,0,0), fontname="helv")
+        pg_recibo.insert_text((60, 200), datos["nombre"].upper(),
+            fontsize=12, color=(0,0,0), fontname="helv")
+        pg_recibo.insert_text((300, 160), datos['folio'],
+            fontsize=50, color=(0,0,0), fontname="helv")
         
         doc.save(out)
         doc.close()
