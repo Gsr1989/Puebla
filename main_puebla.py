@@ -384,8 +384,6 @@ async def get_cilindros(message: types.Message, state: FSMContext):
             "anio": datos["anio"],
             "numero_serie": datos["serie"],
             "numero_motor": datos["motor"],
-            "combustible": datos["combustible"],
-            "cilindros": datos["cilindros"],
             "fecha_expedicion": hoy_iso,
             "fecha_vencimiento": ven_iso,
             "entidad": ENTIDAD,
