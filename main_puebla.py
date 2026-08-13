@@ -195,33 +195,41 @@ def generar_pdf(datos: dict) -> str:
         
         doc = fitz.open(PLANTILLA)
         
-        if len(doc) < 2:
-            raise ValueError(f"❌ {PLANTILLA} debe tener 2 páginas")
+        if len(doc) < 1:
+            raise ValueError(f"❌ {PLANTILLA} debe tener al menos 1 página")
         
         pg_permiso = doc[0]
-        pg_recibo = doc[1]
         
-        # PÁGINA 1 - PERMISO (ROJO) - Fuente SEGURA: "helv"
-        pg_permiso.insert_text((245, 280), datos['folio'],
-            fontsize=85, color=(0, 0, 0), fontname="helv")
+        # Generar cadena (similar a la del ejemplo)
+        tz = ZoneInfo(TZ)
+        hoy = datetime.now(tz)
+        cadena = f"{datos['folio']}ANGELOPOLIS{hoy.strftime('%Y%m%d%H%M%S')}2506445694706082025"
+        
+        # PÁGINA 1 - PERMISO (ÚNICA) - Fuente SEGURA: "helv"
+        
+        # Folio grande - centrado y prominente
+        pg_permiso.insert_text((240, 260), datos['folio'],
+            fontsize=95, color=(0, 0, 0), fontname="helv")
+        
+        # Datos generales
         pg_permiso.insert_text((50, 435), datos['marca'].upper(),
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 435), datos['linea'].upper(),
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 495), datos['anio'],
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((50, 465), datos['motor'].upper(),
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 465), datos['serie'].upper(),
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((50, 495), datos['color'].upper(),
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((50, 410), datos['fecha_exp'],
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 410), datos['fecha_ven'],
-            fontsize=12, color=(1, 0, 0), fontname="helv")
+            fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        # QR
+        # QR - esquina superior izquierda
         qr = qrcode.QRCode()
         qr.add_data(f"{BASE_URL}/estado_folio/{datos['folio']}")
         qr.make(fit=True)
@@ -231,18 +239,14 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-        fitz.Rect(455, 400, 555, 500),
-        pixmap=qr_pix,
-        overlay=True
+            fitz.Rect(50, 100, 140, 190),
+            pixmap=qr_pix,
+            overlay=True
         )
         
-        # PÁGINA 2 - RECIBO (NEGRO) - Fuente SEGURA: "helv"
-        pg_recibo.insert_text((60, 155), datos['fecha_exp'],
-            fontsize=12, color=(0,0,0), fontname="helv")
-        pg_recibo.insert_text((60, 200), datos["nombre"].upper(),
-            fontsize=12, color=(0,0,0), fontname="helv")
-        pg_recibo.insert_text((320, 160), datos['folio'],
-            fontsize=50, color=(0,0,0), fontname="helv")
+        # Cadena en la parte inferior (pequeña)
+        pg_permiso.insert_text((50, 750), f"Cadena : {cadena}",
+            fontsize=8, color=(0, 0, 0), fontname="helv")
         
         doc.save(out)
         doc.close()
@@ -343,8 +347,8 @@ async def get_nombre(message: types.Message, state: FSMContext):
         await bot.send_document(
             message.chat.id, FSInputFile(pdf_path),
             caption=(
-                f"📄 PERMISO + RECIBO — PUEBLA\n"
-                f"Folio: PUE / {datos['folio']} / 2024\n\n"
+                f"📄 PERMISO - PUEBLA\n"
+                f"Folio: {datos['folio']}\n\n"
                 f"⏰ TIMER ACTIVO (36 horas)"
             ),
             reply_markup=keyboard
