@@ -213,15 +213,15 @@ def generar_pdf(datos: dict) -> str:
             fontsize=60, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
-        pg_permiso.insert_text((80, 305), datos['marca'],
+        pg_permiso.insert_text((85, 305), datos['marca'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((255, 305), datos['linea'],
+        pg_permiso.insert_text((270, 305), datos['linea'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((80, 340), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 465), datos['motor'],
+        pg_permiso.insert_text((270, 130), datos['motor'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 465), datos['serie'],
+        pg_permiso.insert_text((270, 120), datos['serie'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
@@ -230,7 +230,7 @@ def generar_pdf(datos: dict) -> str:
         pg_permiso.insert_text((225, 520), datos['cilindros'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        pg_permiso.insert_text((50, 410), datos['fecha_exp'],
+        pg_permiso.insert_text((270, 110), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 410), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
