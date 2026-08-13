@@ -208,8 +208,8 @@ def generar_pdf(datos: dict) -> str:
         
         # PÁGINA 1 - PERMISO (ÚNICA) - Fuente SEGURA: "helv"
         
-        # Folio grande - centrado y prominente
-        pg_permiso.insert_text((240, 260), datos['folio'],
+        # Folio grande - 10 puntos a la izquierda
+        pg_permiso.insert_text((230, 260), datos['folio'],
             fontsize=95, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
@@ -235,7 +235,7 @@ def generar_pdf(datos: dict) -> str:
         pg_permiso.insert_text((225, 410), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        # QR - esquina superior izquierda
+        # QR - esquina superior izquierda, bajado 20 puntos
         qr = qrcode.QRCode()
         qr.add_data(f"{BASE_URL}/estado_folio/{datos['folio']}")
         qr.make(fit=True)
@@ -245,7 +245,7 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-            fitz.Rect(50, 100, 140, 190),
+            fitz.Rect(50, 120, 140, 210),
             pixmap=qr_pix,
             overlay=True
         )
@@ -351,8 +351,16 @@ async def get_cilindros(message: types.Message, state: FSMContext):
     tz = ZoneInfo(TZ)
     hoy = datetime.now(tz)
     ven = hoy + timedelta(days=30)
-    datos["fecha_exp"] = hoy.strftime("%d DE %B %Y").upper()
-    datos["fecha_ven"] = ven.strftime("%d DE %B %Y").upper()
+    
+    # Meses en español
+    meses_es = {
+        1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
+        5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
+        9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
+    }
+    
+    datos["fecha_exp"] = f"{hoy.day:02d} DE {meses_es[hoy.month]} {hoy.year}"
+    datos["fecha_ven"] = f"{ven.day:02d} DE {meses_es[ven.month]} {ven.year}"
     
     await state.clear()
     await message.answer(f"🔄 Generando permiso {datos['folio']}...")
