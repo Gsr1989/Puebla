@@ -213,11 +213,11 @@ def generar_pdf(datos: dict) -> str:
             fontsize=60, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
-        pg_permiso.insert_text((70, 335), datos['marca'],
+        pg_permiso.insert_text((80, 305), datos['marca'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 435), datos['linea'],
+        pg_permiso.insert_text((255, 305), datos['linea'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((70, 350), datos['anio'],
+        pg_permiso.insert_text((80, 340), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((50, 465), datos['motor'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
