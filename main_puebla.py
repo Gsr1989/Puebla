@@ -221,14 +221,14 @@ def generar_pdf(datos: dict) -> str:
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((585, 285), datos['motor'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((585, 255), datos['serie'],
+        pg_permiso.insert_text((575, 255), datos['serie'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
-        pg_permiso.insert_text((390, 400), datos['cilindros'],
+        pg_permiso.insert_text((390, 398), datos['cilindros'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        pg_permiso.insert_text((350, 430), datos['fecha_exp'],
+        pg_permiso.insert_text((350, 428), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((585, 225), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
@@ -243,7 +243,7 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-            fitz.Rect(50, 170, 140, 260),
+            fitz.Rect(50, 220, 140, 310),
             pixmap=qr_pix,
             overlay=True
         )
