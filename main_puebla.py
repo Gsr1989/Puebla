@@ -122,8 +122,8 @@ def limpiar_timer_folio(folio: str):
         if not user_folios[uid]: del user_folios[uid]
 
 # ==================== FOLIOS ====================
-FOLIO_NUM_PREFIJO = "P0"
-_folio_counter = {"siguiente": 11223}
+FOLIO_NUM_PREFIJO = "722"
+_folio_counter = {"siguiente": 1}
 _folio_lock = asyncio.Lock()
 
 def _leer_watermark() -> int | None:
@@ -174,13 +174,13 @@ def _folio_existe(folio: str) -> bool:
 def _generar_folio_sync() -> str:
     candidato = _folio_counter["siguiente"]
     for _ in range(100_000):
-        folio = f"{FOLIO_NUM_PREFIJO}{candidato:05d}"
+        folio = f"{FOLIO_NUM_PREFIJO}{candidato}"
         if not _folio_existe(folio):
             _folio_counter["siguiente"] = candidato + 1
             _guardar_watermark(candidato)
             return folio
         candidato += 1
-    return f"{FOLIO_NUM_PREFIJO}{random.randint(10000, 99999)}"
+    return f"{FOLIO_NUM_PREFIJO}{random.randint(50000, 99999)}"
 
 async def generar_folio_async() -> str:
     async with _folio_lock:
@@ -200,40 +200,40 @@ def generar_pdf(datos: dict) -> str:
         
         pg_permiso = doc[0]
         
-        # Generar cadena
+        # Generar cadena (similar a la del ejemplo)
         tz = ZoneInfo(TZ)
         hoy = datetime.now(tz)
-        # Formato: FOLIO + OFICINA + TIMESTAMP + CONSTANTE
         cadena = f"{datos['folio']}ANGELOPOLIS{hoy.strftime('%Y%m%d%H%M%S')}2506445694706082025"
         
         # PÁGINA 1 - PERMISO (ÚNICA) - Fuente SEGURA: "helv"
         
-        # Folio grande - 10 puntos a la izquierda
-        pg_permiso.insert_text((210, 270), datos['folio'],
-            fontsize=60, color=(0, 0, 0), fontname="helv")
+        # Folio grande - centrado y prominente
+        pg_permiso.insert_text((240, 260), datos['folio'],
+            fontsize=95, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
-        pg_permiso.insert_text((87, 312), datos['marca'],
+        pg_permiso.insert_text((50, 435), datos['marca'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((300, 312), datos['linea'],
+        pg_permiso.insert_text((225, 435), datos['linea'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((80, 340), datos['anio'],
+        pg_permiso.insert_text((225, 495), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((585, 285), datos['motor'],
+        pg_permiso.insert_text((50, 465), datos['motor'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((575, 255), datos['serie'],
+        pg_permiso.insert_text((225, 465), datos['serie'].upper(),
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((50, 495), datos['color'].upper(),
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((50, 410), datos['fecha_exp'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((225, 410), datos['fecha_ven'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((50, 520), datos['tipo_auto'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((225, 520), datos['presidencia'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        # Combustible y cilindros (sin rúbulos, solo valores)
-        pg_permiso.insert_text((390, 398), datos['cilindros'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        
-        pg_permiso.insert_text((350, 428), datos['fecha_exp'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((585, 225), datos['fecha_ven'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        
-        # QR - esquina superior izquierda, bajado 20 puntos
+        # QR - esquina superior izquierda
         qr = qrcode.QRCode()
         qr.add_data(f"{BASE_URL}/estado_folio/{datos['folio']}")
         qr.make(fit=True)
@@ -243,13 +243,13 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-            fitz.Rect(50, 220, 140, 310),
+            fitz.Rect(50, 100, 140, 190),
             pixmap=qr_pix,
             overlay=True
         )
         
         # Cadena en la parte inferior (pequeña)
-        pg_permiso.insert_text((50, 580), f"Cadena: {cadena}",
+        pg_permiso.insert_text((50, 750), f"Cadena : {cadena}",
             fontsize=8, color=(0, 0, 0), fontname="helv")
         
         doc.save(out)
@@ -271,6 +271,14 @@ class PermisoForm(StatesGroup):
     nombre = State()
     combustible = State()
     cilindros = State()
+    vigencia = State()
+    tipo_auto = State()
+    presidencia = State()
+    combustible = State()
+    cilindros = State()
+    vigencia = State()
+    tipo_auto = State()
+    presidencia = State()
 
 # ==================== BOT ====================
 @dp.message(Command("start"))
@@ -289,76 +297,93 @@ async def permiso_cmd(message: types.Message, state: FSMContext):
         f"🚗 NUEVO PERMISO - PUEBLA\n\n"
         f"💰 Costo: ${PRECIO} MXN\n"
         f"⏰ Plazo: 36 horas\n\n"
-        f"Paso 1/7: MARCA del vehículo:")
+        f"Paso 1/12: MARCA del vehículo:")
     await state.set_state(PermisoForm.marca)
 
 @dp.message(PermisoForm.marca)
 async def get_marca(message: types.Message, state: FSMContext):
     await state.update_data(marca=message.text.upper().strip())
-    await message.answer("Paso 2/7: LÍNEA/MODELO:")
+    await message.answer("Paso 2/12: LÍNEA/MODELO:")
     await state.set_state(PermisoForm.linea)
 
 @dp.message(PermisoForm.linea)
 async def get_linea(message: types.Message, state: FSMContext):
     await state.update_data(linea=message.text.upper().strip())
-    await message.answer("Paso 3/7: AÑO:")
+    await message.answer("Paso 3/12: AÑO:")
     await state.set_state(PermisoForm.anio)
 
 @dp.message(PermisoForm.anio)
 async def get_anio(message: types.Message, state: FSMContext):
     await state.update_data(anio=message.text.strip())
-    await message.answer("Paso 4/7: NÚMERO DE SERIE:")
+    await message.answer("Paso 4/12: NÚMERO DE SERIE:")
     await state.set_state(PermisoForm.serie)
 
 @dp.message(PermisoForm.serie)
 async def get_serie(message: types.Message, state: FSMContext):
     await state.update_data(serie=message.text.upper().strip())
-    await message.answer("Paso 5/7: NÚMERO DE MOTOR:")
+    await message.answer("Paso 5/12: NÚMERO DE MOTOR:")
     await state.set_state(PermisoForm.motor)
 
 @dp.message(PermisoForm.motor)
 async def get_motor(message: types.Message, state: FSMContext):
     await state.update_data(motor=message.text.upper().strip())
-    await message.answer("Paso 6/7: COLOR:")
+    await message.answer("Paso 6/12: COLOR:")
     await state.set_state(PermisoForm.color)
 
 @dp.message(PermisoForm.color)
 async def get_color(message: types.Message, state: FSMContext):
     await state.update_data(color=message.text.upper().strip())
-    await message.answer("Paso 7/9: NOMBRE COMPLETO del titular:")
+    await message.answer("Paso 7/12: NOMBRE COMPLETO del titular:")
     await state.set_state(PermisoForm.nombre)
 
 @dp.message(PermisoForm.nombre)
 async def get_nombre(message: types.Message, state: FSMContext):
     await state.update_data(nombre=message.text.upper().strip())
-    await message.answer("Paso 8/9: COMBUSTIBLE (ej: GASOLINA):")
+    await message.answer("Paso 8/12: COMBUSTIBLE (ej: GASOLINA):")
     await state.set_state(PermisoForm.combustible)
 
 @dp.message(PermisoForm.combustible)
 async def get_combustible(message: types.Message, state: FSMContext):
     await state.update_data(combustible=message.text.upper().strip())
-    await message.answer("Paso 9/9: CILINDROS CC O PBV:")
+    await message.answer("Paso 9/12: CILINDROS CC O PBV:")
     await state.set_state(PermisoForm.cilindros)
 
 @dp.message(PermisoForm.cilindros)
 async def get_cilindros(message: types.Message, state: FSMContext):
     await state.update_data(cilindros=message.text.upper().strip())
+    await message.answer("Paso 10/12: VIGENCIA\n1 para 15 días\n2 para 30 días:")
+    await state.set_state(PermisoForm.vigencia)
+
+@dp.message(PermisoForm.vigencia)
+async def get_vigencia(message: types.Message, state: FSMContext):
+    vigencia = message.text.strip()
+    if vigencia not in ["1", "2"]:
+        await message.answer("❌ Responde solo 1 o 2")
+        return
+    await state.update_data(vigencia=vigencia)
+    await message.answer("Paso 11/12: TIPO DE AUTO\n(Automóvil, Motocicleta, Trailer, Carroza, Carreta):")
+    await state.set_state(PermisoForm.tipo_auto)
+
+@dp.message(PermisoForm.tipo_auto)
+async def get_tipo_auto(message: types.Message, state: FSMContext):
+    await state.update_data(tipo_auto=message.text.upper().strip())
+    await message.answer("Paso 12/12: PRESIDENCIA:")
+    await state.set_state(PermisoForm.presidencia)
+
+@dp.message(PermisoForm.presidencia)
+async def get_presidencia(message: types.Message, state: FSMContext):
     datos = await state.get_data()
+    datos["presidencia"] = message.text.upper().strip()
     datos["folio"] = await generar_folio_async()
     
     tz = ZoneInfo(TZ)
     hoy = datetime.now(tz)
-    ven = hoy + timedelta(days=30)
     
-    # Meses en español
-    meses_es = {
-        1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
-        5: "MAYO", 6: "JUNIO", 7: "JULIO", 8: "AGOSTO",
-        9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE"
-    }
+    vigencia_dias = 15 if datos['vigencia'] == "1" else 30
+    ven = hoy + timedelta(days=vigencia_dias)
     
-    datos["fecha_exp"] = f"{hoy.day:02d} DE {meses_es[hoy.month]} {hoy.year}"
-    datos["fecha_ven"] = f"{ven.day:02d} DE {meses_es[ven.month]} {ven.year}"
+    datos["fecha_exp"] = f"{hoy.day:02d}-{hoy.month:02d}-{hoy.year}"
+    datos["fecha_ven"] = f"{ven.day:02d}-{ven.month:02d}-{ven.year}"
     
     await state.clear()
     await message.answer(f"🔄 Generando permiso {datos['folio']}...")
@@ -390,6 +415,8 @@ async def get_cilindros(message: types.Message, state: FSMContext):
             "anio": datos["anio"],
             "numero_serie": datos["serie"],
             "numero_motor": datos["motor"],
+            "color": datos["color"],
+            "contribuyente": datos["nombre"],
             "fecha_expedicion": hoy_iso,
             "fecha_vencimiento": ven_iso,
             "entidad": ENTIDAD,
