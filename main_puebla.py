@@ -219,9 +219,9 @@ def generar_pdf(datos: dict) -> str:
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((80, 340), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((575, 290), datos['motor'],
+        pg_permiso.insert_text((585, 285), datos['motor'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((575, 260), datos['serie'],
+        pg_permiso.insert_text((585, 255), datos['serie'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
@@ -232,7 +232,7 @@ def generar_pdf(datos: dict) -> str:
         
         pg_permiso.insert_text((270, 110), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((575, 230), datos['fecha_ven'],
+        pg_permiso.insert_text((585, 225), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # QR - esquina superior izquierda, bajado 20 puntos
