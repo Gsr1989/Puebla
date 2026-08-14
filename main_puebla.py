@@ -215,7 +215,7 @@ def generar_pdf(datos: dict) -> str:
         # Datos generales
         pg_permiso.insert_text((85, 310), datos['marca'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((290, 310), datos['linea'],
+        pg_permiso.insert_text((300, 310), datos['linea'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((80, 340), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
@@ -225,10 +225,10 @@ def generar_pdf(datos: dict) -> str:
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
-        pg_permiso.insert_text((350, 420), datos['cilindros'],
+        pg_permiso.insert_text((390, 390), datos['cilindros'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        pg_permiso.insert_text((350, 450), datos['fecha_exp'],
+        pg_permiso.insert_text((350, 420), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((585, 225), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
@@ -249,7 +249,7 @@ def generar_pdf(datos: dict) -> str:
         )
         
         # Cadena en la parte inferior (pequeña)
-        pg_permiso.insert_text((50, 750), f"Cadena: {cadena}",
+        pg_permiso.insert_text((50, 480), f"Cadena: {cadena}",
             fontsize=8, color=(0, 0, 0), fontname="helv")
         
         doc.save(out)
