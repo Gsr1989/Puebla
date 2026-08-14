@@ -3481,6 +3481,566 @@ async def api_consultar(folio: str):
 async def health():
     return {"status": "ok", "app": "Puebla"}
 
+# ==================== EXTENSIONES NUEVAS - SOLO COPIAR AL FINAL DEL ARCHIVO ====================
+
+# ==================== CREAR PERMISO ====================
+@app.get("/admin/crear", response_class=HTMLResponse)
+async def crear_permiso_get(request: Request):
+    if not request.session.get("admin"):
+        return RedirectResponse("/login", status_code=302)
+
+    return HTMLResponse("""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Crear Permiso - Puebla</title>
+    <style>
+        :root { --vino: #5f1b2d; --azul: #001B4C; --dorado: #c79b66; --fondo: #f4f5f7; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--fondo); font-family: Arial, sans-serif; color: #495057; }
+        .layout { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+        .sidebar { background: var(--vino); color: white; padding: 24px 17px; }
+        .brand { padding: 0 10px 23px; border-bottom: 1px solid rgba(255,255,255,0.18); margin-bottom: 20px; }
+        .brand h2 { margin: 0; font-size: 1.25rem; }
+        .brand p { margin: 5px 0 0; opacity: 0.72; font-size: 0.8rem; }
+        .menu { display: flex; flex-direction: column; gap: 6px; }
+        .menu a { color: white; text-decoration: none; padding: 12px 13px; border-radius: 8px; font-size: 0.92rem; }
+        .menu a:hover, .menu a.active { background: rgba(255,255,255,0.14); }
+        .logout { margin-top: 12px; background: rgba(0,0,0,0.15); }
+        .topbar { background: white; min-height: 72px; padding: 0 28px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .topbar h1 { margin: 0; color: var(--azul); font-size: 1.35rem; }
+        .content { padding: 30px; }
+        .form-container { background: white; border-radius: 14px; padding: 30px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); max-width: 800px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; color: #555; margin-bottom: 8px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        input:focus, select:focus { outline: none; border-color: var(--dorado); box-shadow: 0 0 0 3px rgba(199,155,102,0.15); }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        button { background: var(--dorado); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600; }
+        button:hover { background: #b8894e; }
+        .btn-back { background: #999; margin-top: 20px; margin-right: 10px; }
+        .btn-back:hover { background: #777; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #e7abb1; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none; }
+        @media(max-width:900px) { .layout { grid-template-columns: 1fr; } .sidebar { display: none; } .grid-2 { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand"><h2>Panel Puebla</h2><p>Administración</p></div>
+            <nav class="menu">
+                <a href="/admin">📊 Dashboard</a>
+                <a href="/admin/crear" class="active">➕ Crear permiso</a>
+                <a href="/admin/folios">📄 Gestionar folios</a>
+                <a href="/logout" class="logout">🚪 Salir</a>
+            </nav>
+        </aside>
+        <section class="main" style="min-width:0;">
+            <header class="topbar"><h1>Crear Nuevo Permiso</h1></header>
+            <main class="content">
+                <div class="form-container">
+                    <div id="error" class="error"></div>
+                    <div id="success" class="success"></div>
+                    <form id="permisoForm">
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="marca">Marca del vehículo</label>
+                                <input type="text" id="marca" name="marca" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="linea">Línea / Modelo</label>
+                                <input type="text" id="linea" name="linea" required>
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="anio">Año</label>
+                                <input type="text" id="anio" name="anio" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="serie">Número de Serie</label>
+                                <input type="text" id="serie" name="serie" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="motor">Número de Motor</label>
+                            <input type="text" id="motor" name="motor" required>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="color">Color</label>
+                                <input type="text" id="color" name="color" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="nombre">Nombre del titular</label>
+                                <input type="text" id="nombre" name="nombre" required>
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="combustible">Combustible</label>
+                                <input type="text" id="combustible" name="combustible" placeholder="Ej: GASOLINA" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cilindros">Cilindros / CC</label>
+                                <input type="text" id="cilindros" name="cilindros" required>
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="vigencia">Vigencia</label>
+                                <select id="vigencia" name="vigencia" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="1">15 días</option>
+                                    <option value="2">30 días</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="tipo_auto">Tipo de automóvil</label>
+                                <select id="tipo_auto" name="tipo_auto" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option>Automóvil</option>
+                                    <option>Motocicleta</option>
+                                    <option>Trailer</option>
+                                    <option>Carroza</option>
+                                    <option>Carreta</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="presidencia">Presidencia</label>
+                            <input type="text" id="presidencia" name="presidencia" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Fecha de Expedición</label>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <input type="date" id="fecha_exp" style="flex:1;">
+                                <button type="button" class="btn-back" onclick="cambiarFecha(-1)">← 1 día</button>
+                                <button type="button" class="btn-back" onclick="cambiarFecha(0)">Hoy</button>
+                                <button type="button" class="btn-back" onclick="cambiarFecha(1)">1 día →</button>
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="folio">Folio (dejar en blanco para auto-generar)</label>
+                                <input type="text" id="folio" name="folio" placeholder="Ej: P072200123">
+                            </div>
+                        </div>
+
+                        <div style="display:flex;gap:10px;">
+                            <button type="submit">✓ Crear Permiso</button>
+                            <button type="button" class="btn-back" onclick="window.location='/admin';">← Volver</button>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <script>
+        function cambiarFecha(dias) {
+            const input = document.getElementById('fecha_exp');
+            const fecha = new Date();
+            fecha.setDate(fecha.getDate() + dias);
+            input.valueAsDate = fecha;
+        }
+        
+        document.getElementById('fecha_exp').valueAsDate = new Date();
+
+        document.getElementById('permisoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = new FormData(document.getElementById('permisoForm'));
+            const datos = Object.fromEntries(form);
+
+            try {
+                const res = await fetch('/admin/crear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos)
+                });
+
+                const result = await res.json();
+
+                if (result.ok) {
+                    document.getElementById('success').style.display = 'block';
+                    document.getElementById('success').innerHTML = `✓ Permiso creado: <strong>${result.folio}</strong>`;
+                    document.getElementById('permisoForm').reset();
+                    document.getElementById('fecha_exp').valueAsDate = new Date();
+                } else {
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').innerHTML = `✗ Error: ${result.error}`;
+                }
+            } catch (err) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = `✗ Error: ${err.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
+""")
+
+@app.post("/admin/crear")
+async def crear_permiso_post(request: Request):
+    if not request.session.get("admin"):
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    try:
+        datos = await request.json()
+        
+        if datos.get('folio') and datos['folio'].strip():
+            folio = datos['folio'].upper().strip()
+            if _folio_existe(folio):
+                return JSONResponse({"ok": False, "error": "El folio ya existe"})
+        else:
+            folio = await generar_folio_async()
+        
+        tz = ZoneInfo(TZ)
+        fecha_exp = datetime.strptime(datos['fecha_exp'], '%Y-%m-%d').date()
+        vigencia_dias = 15 if datos['vigencia'] == '1' else 30
+        fecha_ven = fecha_exp + timedelta(days=vigencia_dias)
+        
+        pdf_datos = {
+            'folio': folio,
+            'marca': datos['marca'].upper().strip(),
+            'linea': datos['linea'].upper().strip(),
+            'anio': datos['anio'].strip(),
+            'serie': datos['serie'].upper().strip(),
+            'motor': datos['motor'].upper().strip(),
+            'color': datos['color'].upper().strip(),
+            'nombre': datos['nombre'].upper().strip(),
+            'combustible': datos['combustible'].upper().strip(),
+            'cilindros': datos['cilindros'].upper().strip(),
+            'tipo_auto': datos['tipo_auto'].upper().strip(),
+            'presidencia': datos['presidencia'].upper().strip(),
+            'fecha_exp': f"{fecha_exp.day:02d}-{fecha_exp.month:02d}-{fecha_exp.year}",
+            'fecha_ven': f"{fecha_ven.day:02d}-{fecha_ven.month:02d}-{fecha_ven.year}"
+        }
+        
+        await asyncio.to_thread(generar_pdf, pdf_datos)
+        
+        supabase.table("folios_registrados").insert({
+            "folio": folio,
+            "marca": pdf_datos['marca'],
+            "linea": pdf_datos['linea'],
+            "anio": pdf_datos['anio'],
+            "numero_serie": pdf_datos['serie'],
+            "numero_motor": pdf_datos['motor'],
+            "color": pdf_datos['color'],
+            "contribuyente": pdf_datos['nombre'],
+            "fecha_expedicion": fecha_exp.isoformat(),
+            "fecha_vencimiento": fecha_ven.isoformat(),
+            "entidad": ENTIDAD,
+            "estado": "PENDIENTE",
+            "user_id": 0,
+            "username": "admin"
+        }).execute()
+        
+        return JSONResponse({"ok": True, "folio": folio})
+    
+    except Exception as e:
+        print(f"❌ Error creando permiso: {e}")
+        return JSONResponse({"ok": False, "error": str(e)})
+
+# ==================== GESTIONAR FOLIOS ====================
+@app.get("/admin/folios", response_class=HTMLResponse)
+async def gestionar_folios(request: Request):
+    if not request.session.get("admin"):
+        return RedirectResponse("/login", status_code=302)
+
+    return HTMLResponse("""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Gestionar Folios - Puebla</title>
+    <style>
+        :root { --vino: #5f1b2d; --azul: #001B4C; --dorado: #c79b66; --fondo: #f4f5f7; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--fondo); font-family: Arial, sans-serif; color: #495057; }
+        .layout { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+        .sidebar { background: var(--vino); color: white; padding: 24px 17px; }
+        .brand { padding: 0 10px 23px; border-bottom: 1px solid rgba(255,255,255,0.18); margin-bottom: 20px; }
+        .brand h2 { margin: 0; font-size: 1.25rem; }
+        .brand p { margin: 5px 0 0; opacity: 0.72; font-size: 0.8rem; }
+        .menu { display: flex; flex-direction: column; gap: 6px; }
+        .menu a { color: white; text-decoration: none; padding: 12px 13px; border-radius: 8px; font-size: 0.92rem; }
+        .menu a:hover, .menu a.active { background: rgba(255,255,255,0.14); }
+        .logout { margin-top: 12px; background: rgba(0,0,0,0.15); }
+        .topbar { background: white; min-height: 72px; padding: 0 28px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .topbar h1 { margin: 0; color: var(--azul); font-size: 1.35rem; }
+        .content { padding: 30px; }
+        .panel { background: white; border-radius: 14px; padding: 30px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+        .search-bar { display: grid; grid-template-columns: 1fr 1fr 1fr auto auto; gap: 12px; margin-bottom: 25px; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        input:focus { outline: none; border-color: var(--dorado); box-shadow: 0 0 0 3px rgba(199,155,102,0.15); }
+        button { background: var(--dorado); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600; }
+        button:hover { background: #b8894e; }
+        .btn-delete { background: #dc3545; }
+        .btn-delete:hover { background: #c82333; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        th { background: var(--azul); color: white; padding: 15px; text-align: left; font-weight: 600; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f9f9f9; }
+        .checkbox { width: 20px; height: 20px; cursor: pointer; }
+        .estado-vigente { background: #d4edda; color: #155724; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; }
+        .estado-vencido { background: #fff3cd; color: #856404; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; }
+        .loading { display: none; text-align: center; padding: 40px; }
+        .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid var(--dorado); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #e7abb1; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none; }
+        .info-bar { background: #e7f3ff; color: #004085; border: 1px solid #b8daff; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        @media(max-width:900px) { .layout { grid-template-columns: 1fr; } .sidebar { display: none; } .search-bar { grid-template-columns: 1fr; } table { font-size: 0.85rem; } }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand"><h2>Panel Puebla</h2><p>Administración</p></div>
+            <nav class="menu">
+                <a href="/admin">📊 Dashboard</a>
+                <a href="/admin/crear">➕ Crear permiso</a>
+                <a href="/admin/folios" class="active">📄 Gestionar folios</a>
+                <a href="/logout" class="logout">🚪 Salir</a>
+            </nav>
+        </aside>
+        <section class="main" style="min-width:0;">
+            <header class="topbar"><h1>Gestionar Folios</h1></header>
+            <main class="content">
+                <div class="panel">
+                    <div id="error" class="error"></div>
+                    <div id="success" class="success"></div>
+                    <div class="info-bar">
+                        📊 Total folios en BD: <strong id="total_count">0</strong> | Vigentes: <strong id="vigentes_count">0</strong> | Vencidos: <strong id="vencidos_count">0</strong>
+                    </div>
+
+                    <div class="search-bar">
+                        <input type="text" id="buscar_folio" placeholder="Buscar por folio..." onkeyup="buscar()">
+                        <input type="text" id="buscar_serie" placeholder="Buscar por serie..." onkeyup="buscar()">
+                        <input type="text" id="buscar_entidad" placeholder="Entidad (ej: puebla)..." onkeyup="buscar()">
+                        <button onclick="buscar()">🔍 Buscar</button>
+                        <button class="btn-delete" onclick="eliminarSeleccionados()">🗑 Eliminar</button>
+                    </div>
+
+                    <div id="loading" class="loading"><div class="spinner"></div></div>
+                    
+                    <div id="resultado" style="display:none;">
+                        <p style="margin-bottom:15px;">Resultados encontrados: <strong id="results_count">0</strong></p>
+                        <table id="tabla_folios">
+                            <thead>
+                                <tr>
+                                    <th style="width:30px;"><input type="checkbox" id="selectAll" onchange="seleccionarTodos()"></th>
+                                    <th>Folio</th>
+                                    <th>Marca</th>
+                                    <th>Serie</th>
+                                    <th>Contribuyente</th>
+                                    <th>Expedición</th>
+                                    <th>Vencimiento</th>
+                                    <th>Estado</th>
+                                    <th>Entidad</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla_body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <script>
+        let folios_data = [];
+
+        async function cargarFolios() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultado').style.display = 'none';
+
+            try {
+                const res = await fetch('/admin/api/folios');
+                const data = await res.json();
+                
+                folios_data = data.folios || [];
+                document.getElementById('total_count').textContent = data.total;
+                document.getElementById('vigentes_count').textContent = data.vigentes;
+                document.getElementById('vencidos_count').textContent = data.vencidos;
+                
+                document.getElementById('loading').style.display = 'none';
+                mostrarResultados(folios_data);
+            } catch (err) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = '✗ Error cargando folios: ' + err.message;
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        async function buscar() {
+            const folio = document.getElementById('buscar_folio').value.trim();
+            const serie = document.getElementById('buscar_serie').value.trim();
+            const entidad = document.getElementById('buscar_entidad').value.trim();
+
+            if (!folio && !serie && !entidad) {
+                mostrarResultados(folios_data);
+                return;
+            }
+
+            let resultado = folios_data;
+            if (folio) resultado = resultado.filter(f => f.folio.includes(folio.toUpperCase()));
+            if (serie) resultado = resultado.filter(f => f.numero_serie.includes(serie.toUpperCase()));
+            if (entidad) resultado = resultado.filter(f => f.entidad.toLowerCase().includes(entidad.toLowerCase()));
+
+            mostrarResultados(resultado);
+        }
+
+        function mostrarResultados(folios) {
+            const tbody = document.getElementById('tabla_body');
+            const results = document.getElementById('results_count');
+            tbody.innerHTML = '';
+            results.textContent = folios.length;
+
+            if (folios.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;">No hay resultados</td></tr>';
+                document.getElementById('resultado').style.display = 'block';
+                return;
+            }
+
+            const hoy = new Date().toISOString().split('T')[0];
+
+            folios.forEach((f, idx) => {
+                const vigente = f.fecha_vencimiento >= hoy ? 'vigente' : 'vencido';
+                const row = `<tr>
+                    <td><input type="checkbox" class="checkbox checkbox_folio" data-folio="${f.folio}"></td>
+                    <td><strong>${f.folio}</strong></td>
+                    <td>${f.marca || '—'}</td>
+                    <td>${f.numero_serie || '—'}</td>
+                    <td>${f.contribuyente || '—'}</td>
+                    <td>${f.fecha_expedicion || '—'}</td>
+                    <td>${f.fecha_vencimiento || '—'}</td>
+                    <td><span class="estado-${vigente}">${vigente.toUpperCase()}</span></td>
+                    <td>${f.entidad || '—'}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+            document.getElementById('resultado').style.display = 'block';
+        }
+
+        function seleccionarTodos() {
+            const checked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.checkbox_folio').forEach(cb => cb.checked = checked);
+        }
+
+        async function eliminarSeleccionados() {
+            const seleccionados = Array.from(document.querySelectorAll('.checkbox_folio:checked')).map(cb => cb.dataset.folio);
+            
+            if (seleccionados.length === 0) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = '✗ Selecciona al menos un folio';
+                return;
+            }
+
+            if (!confirm(`¿Eliminar ${seleccionados.length} folios? Esta acción no se puede deshacer.`)) return;
+
+            try {
+                const res = await fetch('/admin/api/eliminar_folios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folios: seleccionados })
+                });
+
+                const result = await res.json();
+                
+                document.getElementById('success').style.display = 'block';
+                document.getElementById('success').textContent = `✓ Eliminados: ${result.eliminados} | Errores: ${result.errores}`;
+                
+                cargarFolios();
+            } catch (err) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = '✗ Error: ' + err.message;
+            }
+        }
+
+        cargarFolios();
+    </script>
+</body>
+</html>
+""")
+
+@app.get("/admin/api/folios")
+async def api_get_folios(request: Request):
+    if not request.session.get("admin"):
+        raise HTTPException(status_code=401)
+
+    try:
+        resp = supabase.table("folios_registrados").select("*").eq("entidad", ENTIDAD).execute()
+        folios = resp.data or []
+    except:
+        folios = []
+    
+    tz = ZoneInfo(TZ)
+    hoy = datetime.now(tz).date()
+    
+    vigentes = vencidos = 0
+    
+    for f in folios:
+        try:
+            fv = datetime.fromisoformat(str(f["fecha_vencimiento"]).replace("Z", "+00:00")).date()
+            if hoy <= fv:
+                vigentes += 1
+            else:
+                vencidos += 1
+        except:
+            pass
+    
+    return {
+        "folios": folios,
+        "total": len(folios),
+        "vigentes": vigentes,
+        "vencidos": vencidos
+    }
+
+@app.post("/admin/api/eliminar_folios")
+async def api_eliminar_folios(request: Request):
+    if not request.session.get("admin"):
+        raise HTTPException(status_code=401)
+
+    datos = await request.json()
+    folios = datos.get("folios", [])
+    
+    eliminados = 0
+    errores = 0
+    
+    for folio in folios:
+        try:
+            supabase.table("folios_registrados").delete().eq("folio", folio).execute()
+            supabase.table("borradores_registros").delete().eq("folio", folio).execute()
+            eliminados += 1
+        except:
+            errores += 1
+    
+    return {
+        "total": len(folios),
+        "eliminados": eliminados,
+        "errores": errores
+    }
+
+# ==================== FIN DE EXTENSIONES ====================
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
