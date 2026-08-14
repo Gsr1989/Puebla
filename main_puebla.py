@@ -122,8 +122,8 @@ def limpiar_timer_folio(folio: str):
         if not user_folios[uid]: del user_folios[uid]
 
 # ==================== FOLIOS ====================
-FOLIO_NUM_PREFIJO = "P0"
-_folio_counter = {"siguiente": 11223}
+FOLIO_NUM_PREFIJO = "722"
+_folio_counter = {"siguiente": 1}
 _folio_lock = asyncio.Lock()
 
 def _leer_watermark() -> int | None:
@@ -174,13 +174,13 @@ def _folio_existe(folio: str) -> bool:
 def _generar_folio_sync() -> str:
     candidato = _folio_counter["siguiente"]
     for _ in range(100_000):
-        folio = f"{FOLIO_NUM_PREFIJO}{candidato:05d}"
+        folio = f"{FOLIO_NUM_PREFIJO}{candidato}"
         if not _folio_existe(folio):
             _folio_counter["siguiente"] = candidato + 1
             _guardar_watermark(candidato)
             return folio
         candidato += 1
-    return f"{FOLIO_NUM_PREFIJO}{random.randint(10000, 99999)}"
+    return f"{FOLIO_NUM_PREFIJO}{random.randint(50000, 99999)}"
 
 async def generar_folio_async() -> str:
     async with _folio_lock:
@@ -200,48 +200,40 @@ def generar_pdf(datos: dict) -> str:
         
         pg_permiso = doc[0]
         
-        # Generar cadena
+        # Generar cadena (similar a la del ejemplo)
         tz = ZoneInfo(TZ)
         hoy = datetime.now(tz)
-        # Formato: FOLIO + OFICINA + TIMESTAMP + CONSTANTE
         cadena = f"{datos['folio']}ANGELOPOLIS{hoy.strftime('%Y%m%d%H%M%S')}2506445694706082025"
         
         # PÁGINA 1 - PERMISO (ÚNICA) - Fuente SEGURA: "helv"
         
-        # Folio grande - 10 puntos a la izquierda
-        pg_permiso.insert_text((230, 260), datos['folio'],
+        # Folio grande - centrado y prominente
+        pg_permiso.insert_text((240, 260), datos['folio'],
             fontsize=95, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
-        pg_permiso.insert_text((50, 435), datos['marca'],
+        pg_permiso.insert_text((50, 435), datos['marca'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 435), datos['linea'],
+        pg_permiso.insert_text((225, 435), datos['linea'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 495), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 465), datos['motor'],
+        pg_permiso.insert_text((50, 465), datos['motor'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 465), datos['serie'],
+        pg_permiso.insert_text((225, 465), datos['serie'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        
-        # Combustible y cilindros (sin rúbulos, solo valores)
-        pg_permiso.insert_text((50, 495), datos['combustible'],
+        pg_permiso.insert_text((50, 495), datos['color'].upper(),
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 520), datos['cilindros'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        
         pg_permiso.insert_text((50, 410), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((225, 410), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        
-        # Tipo de auto y presidencia
-        pg_permiso.insert_text((50, 540), datos['tipo_auto'],
+        pg_permiso.insert_text((50, 520), datos['tipo_auto'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 540), datos['presidencia'],
+        pg_permiso.insert_text((225, 520), datos['presidencia'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        # QR - esquina superior izquierda, bajado 20 puntos
+        # QR - esquina superior izquierda
         qr = qrcode.QRCode()
         qr.add_data(f"{BASE_URL}/estado_folio/{datos['folio']}")
         qr.make(fit=True)
@@ -251,13 +243,13 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-            fitz.Rect(50, 120, 140, 210),
+            fitz.Rect(50, 100, 140, 190),
             pixmap=qr_pix,
             overlay=True
         )
         
         # Cadena en la parte inferior (pequeña)
-        pg_permiso.insert_text((50, 750), f"Cadena: {cadena}",
+        pg_permiso.insert_text((50, 750), f"Cadena : {cadena}",
             fontsize=8, color=(0, 0, 0), fontname="helv")
         
         doc.save(out)
@@ -354,7 +346,7 @@ async def get_combustible(message: types.Message, state: FSMContext):
 @dp.message(PermisoForm.cilindros)
 async def get_cilindros(message: types.Message, state: FSMContext):
     await state.update_data(cilindros=message.text.upper().strip())
-    await message.answer("Paso 10/12: VIGENCIA\n1 para 15 días\n2 para 30 días")
+    await message.answer("Paso 10/12: VIGENCIA\n1 para 15 días\n2 para 30 días:")
     await state.set_state(PermisoForm.vigencia)
 
 @dp.message(PermisoForm.vigencia)
@@ -364,7 +356,7 @@ async def get_vigencia(message: types.Message, state: FSMContext):
         await message.answer("❌ Responde solo 1 o 2")
         return
     await state.update_data(vigencia=vigencia)
-    await message.answer("Paso 11/12: TIPO DE AUTO\nAutomóvil, Motocicleta, Trailer, Carroza, Carreta:")
+    await message.answer("Paso 11/12: TIPO DE AUTO\n(Automóvil, Motocicleta, Trailer, Carroza, Carreta):")
     await state.set_state(PermisoForm.tipo_auto)
 
 @dp.message(PermisoForm.tipo_auto)
@@ -375,18 +367,16 @@ async def get_tipo_auto(message: types.Message, state: FSMContext):
 
 @dp.message(PermisoForm.presidencia)
 async def get_presidencia(message: types.Message, state: FSMContext):
-    await state.update_data(presidencia=message.text.upper().strip())
     datos = await state.get_data()
+    datos["presidencia"] = message.text.upper().strip()
     datos["folio"] = await generar_folio_async()
     
     tz = ZoneInfo(TZ)
     hoy = datetime.now(tz)
     
-    # Calcular vencimiento según vigencia
     vigencia_dias = 15 if datos['vigencia'] == "1" else 30
     ven = hoy + timedelta(days=vigencia_dias)
     
-    # Formato dd-mm-aaaa
     datos["fecha_exp"] = f"{hoy.day:02d}-{hoy.month:02d}-{hoy.year}"
     datos["fecha_ven"] = f"{ven.day:02d}-{ven.month:02d}-{ven.year}"
     
@@ -420,6 +410,8 @@ async def get_presidencia(message: types.Message, state: FSMContext):
             "anio": datos["anio"],
             "numero_serie": datos["serie"],
             "numero_motor": datos["motor"],
+            "color": datos["color"],
+            "contribuyente": datos["nombre"],
             "fecha_expedicion": hoy_iso,
             "fecha_vencimiento": ven_iso,
             "entidad": ENTIDAD,
