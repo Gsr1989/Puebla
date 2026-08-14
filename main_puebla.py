@@ -122,7 +122,7 @@ def limpiar_timer_folio(folio: str):
         if not user_folios[uid]: del user_folios[uid]
 
 # ==================== FOLIOS ====================
-FOLIO_NUM_PREFIJO = "722"
+FOLIO_NUM_PREFIJO = "P0722"
 _folio_counter = {"siguiente": 1}
 _folio_lock = asyncio.Lock()
 
@@ -222,6 +222,10 @@ def generar_pdf(datos: dict) -> str:
         pg_permiso.insert_text((585, 285), datos['motor'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((575, 255), datos['serie'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((50, 520), datos['tipo_auto'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((225, 520), datos['presidencia'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
