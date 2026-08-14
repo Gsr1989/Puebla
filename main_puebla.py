@@ -200,40 +200,40 @@ def generar_pdf(datos: dict) -> str:
         
         pg_permiso = doc[0]
         
-        # Generar cadena (similar a la del ejemplo)
+        # Generar cadena
         tz = ZoneInfo(TZ)
         hoy = datetime.now(tz)
+        # Formato: FOLIO + OFICINA + TIMESTAMP + CONSTANTE
         cadena = f"{datos['folio']}ANGELOPOLIS{hoy.strftime('%Y%m%d%H%M%S')}2506445694706082025"
         
         # PÁGINA 1 - PERMISO (ÚNICA) - Fuente SEGURA: "helv"
         
-        # Folio grande - centrado y prominente
-        pg_permiso.insert_text((240, 260), datos['folio'],
-            fontsize=95, color=(0, 0, 0), fontname="helv")
+        # Folio grande - 10 puntos a la izquierda
+        pg_permiso.insert_text((210, 270), datos['folio'],
+            fontsize=60, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
-        pg_permiso.insert_text((50, 435), datos['marca'].upper(),
+        pg_permiso.insert_text((87, 312), datos['marca'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 435), datos['linea'].upper(),
+        pg_permiso.insert_text((300, 312), datos['linea'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 495), datos['anio'],
+        pg_permiso.insert_text((80, 340), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 465), datos['motor'].upper(),
+        pg_permiso.insert_text((585, 285), datos['motor'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 465), datos['serie'].upper(),
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 495), datos['color'].upper(),
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 410), datos['fecha_exp'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 410), datos['fecha_ven'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((50, 520), datos['tipo_auto'],
-            fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((225, 520), datos['presidencia'],
+        pg_permiso.insert_text((575, 255), datos['serie'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        # QR - esquina superior izquierda
+        # Combustible y cilindros (sin rúbulos, solo valores)
+        pg_permiso.insert_text((390, 398), datos['cilindros'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        
+        pg_permiso.insert_text((350, 428), datos['fecha_exp'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        pg_permiso.insert_text((585, 225), datos['fecha_ven'],
+            fontsize=12, color=(0, 0, 0), fontname="helv")
+        
+        # QR - esquina superior izquierda, bajado 20 puntos
         qr = qrcode.QRCode()
         qr.add_data(f"{BASE_URL}/estado_folio/{datos['folio']}")
         qr.make(fit=True)
@@ -243,13 +243,13 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-            fitz.Rect(50, 100, 140, 190),
+            fitz.Rect(50, 220, 140, 310),
             pixmap=qr_pix,
             overlay=True
         )
         
         # Cadena en la parte inferior (pequeña)
-        pg_permiso.insert_text((50, 750), f"Cadena : {cadena}",
+        pg_permiso.insert_text((50, 580), f"Cadena: {cadena}",
             fontsize=8, color=(0, 0, 0), fontname="helv")
         
         doc.save(out)
