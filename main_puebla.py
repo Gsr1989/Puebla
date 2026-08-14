@@ -225,7 +225,7 @@ def generar_pdf(datos: dict) -> str:
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((340, 340), datos['tipo_auto'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((520, 340), datos['presidencia'],
+        pg_permiso.insert_text((570, 343), datos['presidencia'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
