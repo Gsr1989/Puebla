@@ -213,9 +213,9 @@ def generar_pdf(datos: dict) -> str:
             fontsize=60, color=(0, 0, 0), fontname="helv")
         
         # Datos generales
-        pg_permiso.insert_text((85, 310), datos['marca'],
+        pg_permiso.insert_text((87, 312), datos['marca'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
-        pg_permiso.insert_text((300, 310), datos['linea'],
+        pg_permiso.insert_text((300, 312), datos['linea'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((80, 340), datos['anio'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
@@ -225,10 +225,10 @@ def generar_pdf(datos: dict) -> str:
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
         # Combustible y cilindros (sin rúbulos, solo valores)
-        pg_permiso.insert_text((390, 390), datos['cilindros'],
+        pg_permiso.insert_text((390, 400), datos['cilindros'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         
-        pg_permiso.insert_text((350, 420), datos['fecha_exp'],
+        pg_permiso.insert_text((350, 430), datos['fecha_exp'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
         pg_permiso.insert_text((585, 225), datos['fecha_ven'],
             fontsize=12, color=(0, 0, 0), fontname="helv")
@@ -243,13 +243,13 @@ def generar_pdf(datos: dict) -> str:
         buf.seek(0)
         qr_pix = fitz.Pixmap(buf.read())
         pg_permiso.insert_image(
-            fitz.Rect(50, 120, 140, 210),
+            fitz.Rect(50, 170, 140, 260),
             pixmap=qr_pix,
             overlay=True
         )
         
         # Cadena en la parte inferior (pequeña)
-        pg_permiso.insert_text((50, 480), f"Cadena: {cadena}",
+        pg_permiso.insert_text((50, 580), f"Cadena: {cadena}",
             fontsize=8, color=(0, 0, 0), fontname="helv")
         
         doc.save(out)
