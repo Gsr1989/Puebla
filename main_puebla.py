@@ -3639,13 +3639,12 @@ async def crear_permiso_get(request: Request):
                         <div class="grid-2">
                             <div class="form-group">
                                 <label for="vigencia">Vigencia</label>
-                                <select id="vigencia" name="vigencia" required>
-                                <select id="vigencia" name="vigencia" required>
-                                <option value="">Seleccionar...</option>
-                                <option value="1">15 días</option>
-                                <option value="2">30 días</option>
-                                <option value="3">2 × 15 días — 2x1</option>
-                                </select>
+                        <select id="vigencia" name="vigencia" required>
+                        <option value="">Seleccionar...</option>
+                        <option value="1">15 días</option>
+                        <option value="2">30 días</option>
+                        <option value="3">2 × 15 días — 2x1</option>
+                            </select>
                             </div>
                             <div class="form-group">
                                 <label for="tipo_auto">Tipo de automóvil</label>
@@ -3653,9 +3652,9 @@ async def crear_permiso_get(request: Request):
                                     <option value="">Seleccionar...</option>
                                     <option>Automóvil</option>
                                     <option>Motocicleta</option>
-                                    <option>Trailer</option>
-                                    <option>Carroza</option>
-                                    <option>Carreta</option>
+                                    <option>Suv</option>
+                                    <option>Van</option>
+                                    <option>vagoneta</option>
                                 </select>
                             </div>
                         </div>
