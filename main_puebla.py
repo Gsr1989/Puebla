@@ -3791,65 +3791,624 @@ document.getElementById('fecha_exp').valueAsDate = new Date();
 
 @app.post("/admin/crear")
 async def crear_permiso_post(request: Request):
+
     if not request.session.get("admin"):
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(
+            status_code=401,
+            detail="No autorizado"
+        )
+
+    folios_creados = []
 
     try:
+
         datos = await request.json()
-        
-        if datos.get('folio') and datos['folio'].strip():
-            folio = datos['folio'].upper().strip()
-            if _folio_existe(folio):
-                return JSONResponse({"ok": False, "error": "El folio ya existe"})
-        else:
-            folio = await generar_folio_async()
-        
-        tz = ZoneInfo(TZ)
-        fecha_exp = datetime.strptime(datos['fecha_exp'], '%Y-%m-%d').date()
-        vigencia_dias = 15 if datos['vigencia'] == '1' else 30
-        fecha_ven = fecha_exp + timedelta(days=vigencia_dias)
-        
-        pdf_datos = {
-            'folio': folio,
-            'marca': datos['marca'].upper().strip(),
-            'linea': datos['linea'].upper().strip(),
-            'anio': datos['anio'].strip(),
-            'serie': datos['serie'].upper().strip(),
-            'motor': datos['motor'].upper().strip(),
-            'color': datos['color'].upper().strip(),
-            'nombre': datos['nombre'].upper().strip(),
-            'combustible': datos['combustible'].upper().strip(),
-            'cilindros': datos['cilindros'].upper().strip(),
-            'tipo_auto': datos['tipo_auto'].upper().strip(),
-            'presidencia': datos['presidencia'].upper().strip(),
-            'fecha_exp': f"{fecha_exp.day:02d}-{fecha_exp.month:02d}-{fecha_exp.year}",
-            'fecha_ven': f"{fecha_ven.day:02d}-{fecha_ven.month:02d}-{fecha_ven.year}"
+
+        # =====================================================
+        # VALIDACIONES BÁSICAS
+        # =====================================================
+
+        vigencia = str(
+            datos.get("vigencia", "")
+        ).strip()
+
+        if vigencia not in ("1", "2", "3"):
+            return JSONResponse({
+                "ok": False,
+                "error": "Vigencia inválida"
+            })
+
+        fecha_exp = datetime.strptime(
+            datos["fecha_exp"],
+            "%Y-%m-%d"
+        ).date()
+
+        # =====================================================
+        # DATOS COMUNES
+        # =====================================================
+
+        datos_comunes = {
+            "marca": datos["marca"].upper().strip(),
+            "linea": datos["linea"].upper().strip(),
+            "anio": datos["anio"].strip(),
+            "serie": datos["serie"].upper().strip(),
+            "motor": datos["motor"].upper().strip(),
+            "color": datos["color"].upper().strip(),
+            "nombre": datos["nombre"].upper().strip(),
+            "combustible": datos["combustible"].upper().strip(),
+            "cilindros": datos["cilindros"].upper().strip(),
+            "tipo_auto": datos["tipo_auto"].upper().strip(),
+            "presidencia": datos["presidencia"].upper().strip(),
         }
-        
-        await asyncio.to_thread(generar_pdf, pdf_datos)
-        
-        supabase.table("folios_registrados").insert({
-            "folio": folio,
-            "marca": pdf_datos['marca'],
-            "linea": pdf_datos['linea'],
-            "anio": pdf_datos['anio'],
-            "numero_serie": pdf_datos['serie'],
-            "numero_motor": pdf_datos['motor'],
-            "color": pdf_datos['color'],
-            "contribuyente": pdf_datos['nombre'],
-            "fecha_expedicion": fecha_exp.isoformat(),
-            "fecha_vencimiento": fecha_ven.isoformat(),
-            "entidad": ENTIDAD,
-            "estado": "PENDIENTE",
-            "user_id": 0,
-            "username": "admin"
-        }).execute()
-        
-        return JSONResponse({"ok": True, "folio": folio})
-    
+
+        # =====================================================
+        # PRIMER FOLIO
+        # =====================================================
+
+        folio_manual = (
+            datos.get("folio") or ""
+        ).upper().strip()
+
+        if folio_manual:
+
+            if _folio_existe(folio_manual):
+                return JSONResponse({
+                    "ok": False,
+                    "error": "El folio indicado ya existe"
+                })
+
+            folio_1 = folio_manual
+
+        else:
+
+            folio_1 = await generar_folio_async()
+
+        # =====================================================
+        # MODO 1 = 15 DÍAS
+        # =====================================================
+
+        if vigencia == "1":
+
+            # Día de expedición cuenta como día 1.
+            fecha_ven = (
+                fecha_exp
+                + timedelta(days=14)
+            )
+
+            pdf_datos = {
+                **datos_comunes,
+
+                "folio": folio_1,
+
+                "fecha_exp":
+                    fecha_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            pdf_path = await asyncio.to_thread(
+                generar_pdf,
+                pdf_datos
+            )
+
+            supabase.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio": folio_1,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    "admin"
+
+            }).execute()
+
+            folios_creados.append(
+                folio_1
+            )
+
+            nombre_pdf = os.path.basename(
+                pdf_path
+            )
+
+            return JSONResponse({
+
+                "ok": True,
+
+                "tipo": "15",
+
+                "folio": folio_1,
+
+                "fecha_exp":
+                    fecha_exp.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_ven.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "pdf_url":
+                    f"/admin/descargar/{nombre_pdf}"
+            })
+
+        # =====================================================
+        # MODO 2 = 30 DÍAS NORMALES
+        # =====================================================
+
+        if vigencia == "2":
+
+            # 30 días inclusivos:
+            # día expedición = día 1.
+            fecha_ven = (
+                fecha_exp
+                + timedelta(days=29)
+            )
+
+            pdf_datos = {
+                **datos_comunes,
+
+                "folio": folio_1,
+
+                "fecha_exp":
+                    fecha_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            pdf_path = await asyncio.to_thread(
+                generar_pdf,
+                pdf_datos
+            )
+
+            supabase.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio": folio_1,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    "admin"
+
+            }).execute()
+
+            folios_creados.append(
+                folio_1
+            )
+
+            nombre_pdf = os.path.basename(
+                pdf_path
+            )
+
+            return JSONResponse({
+
+                "ok": True,
+
+                "tipo": "30",
+
+                "folio": folio_1,
+
+                "fecha_exp":
+                    fecha_exp.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_ven.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "pdf_url":
+                    f"/admin/descargar/{nombre_pdf}"
+            })
+
+        # =====================================================
+        # MODO 3 = 2 × 15 DÍAS
+        # =====================================================
+
+        if vigencia == "3":
+
+            # -------------------------------------------------
+            # PERMISO 1
+            # -------------------------------------------------
+
+            fecha_1_exp = fecha_exp
+
+            fecha_1_ven = (
+                fecha_1_exp
+                + timedelta(days=14)
+            )
+
+            # -------------------------------------------------
+            # PERMISO 2
+            # Empieza exactamente al día siguiente
+            # -------------------------------------------------
+
+            fecha_2_exp = (
+                fecha_1_ven
+                + timedelta(days=1)
+            )
+
+            fecha_2_ven = (
+                fecha_2_exp
+                + timedelta(days=14)
+            )
+
+            # -------------------------------------------------
+            # SEGUNDO FOLIO
+            # -------------------------------------------------
+
+            folio_2 = await generar_folio_async()
+
+            # Seguridad extra por improbable colisión
+            while (
+                folio_2 == folio_1
+                or _folio_existe(folio_2)
+            ):
+                folio_2 = await generar_folio_async()
+
+            # -------------------------------------------------
+            # DATOS PDF 1
+            # -------------------------------------------------
+
+            pdf_datos_1 = {
+
+                **datos_comunes,
+
+                "folio":
+                    folio_1,
+
+                "fecha_exp":
+                    fecha_1_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_1_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            # -------------------------------------------------
+            # DATOS PDF 2
+            # -------------------------------------------------
+
+            pdf_datos_2 = {
+
+                **datos_comunes,
+
+                "folio":
+                    folio_2,
+
+                "fecha_exp":
+                    fecha_2_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_2_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            # -------------------------------------------------
+            # GENERAR PDF ÚNICO DE 2 PÁGINAS
+            # -------------------------------------------------
+
+            pdf_final = await asyncio.to_thread(
+                generar_pdf_2x1,
+                pdf_datos_1,
+                pdf_datos_2
+            )
+
+            # -------------------------------------------------
+            # INSERTAR FOLIO 1
+            # -------------------------------------------------
+
+            supabase.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio":
+                    folio_1,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_1_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_1_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    "admin"
+
+            }).execute()
+
+            folios_creados.append(
+                folio_1
+            )
+
+            # -------------------------------------------------
+            # INSERTAR FOLIO 2
+            # -------------------------------------------------
+
+            supabase.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio":
+                    folio_2,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_2_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_2_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    "admin"
+
+            }).execute()
+
+            folios_creados.append(
+                folio_2
+            )
+
+            nombre_pdf = os.path.basename(
+                pdf_final
+            )
+
+            return JSONResponse({
+
+                "ok":
+                    True,
+
+                "tipo":
+                    "2x1",
+
+                "folio_1":
+                    folio_1,
+
+                "folio_2":
+                    folio_2,
+
+                "fecha_1_exp":
+                    fecha_1_exp.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "fecha_1_ven":
+                    fecha_1_ven.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "fecha_2_exp":
+                    fecha_2_exp.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "fecha_2_ven":
+                    fecha_2_ven.strftime(
+                        "%d/%m/%Y"
+                    ),
+
+                "pdf_url":
+                    f"/admin/descargar/{nombre_pdf}"
+            })
+
     except Exception as e:
-        print(f"❌ Error creando permiso: {e}")
-        return JSONResponse({"ok": False, "error": str(e)})
+
+        print(
+            f"❌ Error creando permiso: {e}"
+        )
+
+        # =====================================================
+        # ROLLBACK COMPENSATORIO
+        #
+        # Si el 2x1 alcanzó a insertar el primer folio
+        # pero falla después, borramos lo insertado.
+        # =====================================================
+
+        for folio in folios_creados:
+
+            try:
+
+                supabase.table(
+                    "folios_registrados"
+                ).delete().eq(
+                    "folio",
+                    folio
+                ).execute()
+
+            except Exception as rollback_error:
+
+                print(
+                    "⚠ Error rollback "
+                    f"{folio}: "
+                    f"{rollback_error}"
+                )
+
+        return JSONResponse({
+
+            "ok":
+                False,
+
+            "error":
+                str(e)
+
+        })
+
+@app.get("/admin/descargar/{archivo}")
+async def descargar_pdf(
+    archivo: str,
+    request: Request
+):
+    if not request.session.get("admin"):
+        raise HTTPException(
+            status_code=401,
+            detail="No autorizado"
+        )
+
+    # Evita rutas tipo ../../etc/passwd
+    archivo_seguro = os.path.basename(archivo)
+
+    ruta = os.path.join(
+        OUTPUT_DIR,
+        archivo_seguro
+    )
+
+    if not os.path.exists(ruta):
+        raise HTTPException(
+            status_code=404,
+            detail="Archivo no encontrado"
+        )
+
+    return FileResponse(
+        ruta,
+        media_type="application/pdf",
+        filename=archivo_seguro
+    )
 
 # ==================== GESTIONAR FOLIOS ====================
 @app.get("/admin/folios", response_class=HTMLResponse)
