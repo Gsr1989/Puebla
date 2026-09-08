@@ -1390,8 +1390,8 @@ body {{
             📄 Folios
         </a>
 
-        <a href="/admin/crear_folio">
-            ➕ Crear folio
+        <a href="/admin/crear">
+           ➕ Crear permiso
         </a>
 
         <a href="/admin/usuarios">
@@ -1467,7 +1467,7 @@ body {{
 
     <div class="actions">
 
-        <a class="action" href="/admin/crear_folio">
+        <a class="action" href="/admin/crear">
             <strong>➕ Crear permiso</strong>
             <span>Generar un folio manualmente</span>
         </a>
