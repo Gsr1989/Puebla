@@ -3640,9 +3640,11 @@ async def crear_permiso_get(request: Request):
                             <div class="form-group">
                                 <label for="vigencia">Vigencia</label>
                                 <select id="vigencia" name="vigencia" required>
-                                    <option value="">Seleccionar...</option>
-                                    <option value="1">15 días</option>
-                                    <option value="2">30 días</option>
+                                <select id="vigencia" name="vigencia" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="1">15 días</option>
+                                <option value="2">30 días</option>
+                                <option value="3">2 × 15 días — 2x1</option>
                                 </select>
                             </div>
                             <div class="form-group">
