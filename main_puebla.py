@@ -3719,9 +3719,62 @@ async def crear_permiso_get(request: Request):
 
                 if (result.ok) {
                     document.getElementById('success').style.display = 'block';
-                    document.getElementById('success').innerHTML = `✓ Permiso creado: <strong>${result.folio}</strong>`;
-                    document.getElementById('permisoForm').reset();
-                    document.getElementById('fecha_exp').valueAsDate = new Date();
+
+if (result.tipo === '2x1') {
+
+    document.getElementById('success').innerHTML = `
+        ✓ Paquete 2x1 creado correctamente<br><br>
+
+        <strong>Folio 1:</strong> ${result.folio_1}<br>
+        ${result.fecha_1_exp} → ${result.fecha_1_ven}<br><br>
+
+        <strong>Folio 2:</strong> ${result.folio_2}<br>
+        ${result.fecha_2_exp} → ${result.fecha_2_ven}<br><br>
+
+        <a
+            href="${result.pdf_url}"
+            target="_blank"
+            style="
+                display:inline-block;
+                background:#001B4C;
+                color:white;
+                padding:10px 18px;
+                border-radius:8px;
+                text-decoration:none;
+                font-weight:600;
+            "
+        >
+            📄 Descargar PDF 2x1
+        </a>
+    `;
+
+} else {
+
+    document.getElementById('success').innerHTML = `
+        ✓ Permiso creado:
+        <strong>${result.folio}</strong>
+        <br><br>
+
+        <a
+            href="${result.pdf_url}"
+            target="_blank"
+            style="
+                display:inline-block;
+                background:#001B4C;
+                color:white;
+                padding:10px 18px;
+                border-radius:8px;
+                text-decoration:none;
+                font-weight:600;
+            "
+        >
+            📄 Descargar PDF
+        </a>
+    `;
+}
+
+document.getElementById('permisoForm').reset();
+document.getElementById('fecha_exp').valueAsDate = new Date();
                 } else {
                     document.getElementById('error').style.display = 'block';
                     document.getElementById('error').innerHTML = `✗ Error: ${result.error}`;
