@@ -3667,7 +3667,13 @@ async def crear_permiso_get(request: Request):
                         <div class="form-group">
                             <label>Fecha de Expedición</label>
                             <div style="display:flex;gap:10px;align-items:center;">
-                                <input type="date" id="fecha_exp" style="flex:1;">
+                            <input
+                                type="date"
+                                id="fecha_exp"
+                                name="fecha_exp"
+                                style="flex:1;"
+                                required
+                            >
                                 <button type="button" class="btn-back" onclick="cambiarFecha(-1)">← 1 día</button>
                                 <button type="button" class="btn-back" onclick="cambiarFecha(0)">Hoy</button>
                                 <button type="button" class="btn-back" onclick="cambiarFecha(1)">1 día →</button>
