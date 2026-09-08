@@ -270,6 +270,42 @@ def generar_pdf(datos: dict) -> str:
         print(f"❌ PDF ERROR: {e}")
         raise
 
+def generar_pdf_2x1(datos_1: dict, datos_2: dict) -> str:
+    """
+    Genera los dos permisos individuales y después los une
+    en un solo PDF de 2 páginas.
+    """
+
+    pdf_1 = generar_pdf(datos_1)
+    pdf_2 = generar_pdf(datos_2)
+
+    nombre_final = (
+        f"{datos_1['folio']}_{datos_2['folio']}_2x1_puebla.pdf"
+    )
+
+    out_final = os.path.join(
+        OUTPUT_DIR,
+        nombre_final
+    )
+
+    doc_final = fitz.open()
+
+    try:
+        doc_1 = fitz.open(pdf_1)
+        doc_2 = fitz.open(pdf_2)
+
+        doc_final.insert_pdf(doc_1)
+        doc_final.insert_pdf(doc_2)
+
+        doc_final.save(out_final)
+
+        doc_1.close()
+        doc_2.close()
+
+    finally:
+        doc_final.close()
+
+    return out_final
 # ==================== FSM ====================
 class PermisoForm(StatesGroup):
     marca = State()
