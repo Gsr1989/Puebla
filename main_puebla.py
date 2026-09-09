@@ -34,15 +34,27 @@ import aiohttp
 from urllib.parse import quote
 
 # ==================== CONFIG ====================
-BOT_TOKEN    = os.getenv("BOT_TOKEN_PUEBLA", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN_PUEBLA", "")
+
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-BASE_URL     = "https://smt-puebla-gob-mx.onrender.com"
-OUTPUT_DIR   = "documentos"
-PLANTILLA    = "PUEBLA_PLANTILLA_COMPLETA.pdf"
-ENTIDAD      = "puebla"
-PRECIO       = 180
-TZ           = "America/Mexico_City"
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_KEY
+)
+
+BASE_URL = "https://smt-puebla-gob-mx.onrender.com"
+
+OUTPUT_DIR = "documentos"
+PLANTILLA = "PUEBLA_PLANTILLA_COMPLETA.pdf"
+
+ENTIDAD = "puebla"
+PRECIO = 180
+
+TZ = "America/Mexico_City"
+
 ADMIN_USER = os.getenv("ADMIN_USER", "")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "")
 SECRET_KEY = os.getenv("SECRET_KEY", "")
