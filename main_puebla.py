@@ -5559,6 +5559,603 @@ document
 </html>
 """)
 
+# ============================================================
+# LOGIN DE CLIENTES
+# ============================================================
+
+@app.get("/cliente/login", response_class=HTMLResponse)
+async def cliente_login_get(request: Request):
+
+    if request.session.get("cliente_id"):
+        return RedirectResponse(
+            "/cliente",
+            status_code=302
+        )
+
+    error = request.query_params.get("error")
+
+    error_html = """
+    <div style="
+        background:#f8d7da;
+        color:#721c24;
+        border:1px solid #e7abb1;
+        padding:12px;
+        border-radius:8px;
+        margin-bottom:18px;
+        text-align:center;
+    ">
+        Usuario o contraseña incorrectos
+    </div>
+    """ if error else ""
+
+    return HTMLResponse(f"""
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>Acceso de clientes</title>
+
+<style>
+
+* {{
+    box-sizing:border-box;
+}}
+
+body {{
+    margin:0;
+    min-height:100vh;
+    font-family:Arial,sans-serif;
+    background:#f4f4f4;
+}}
+
+.header {{
+    background:white;
+    padding:22px;
+    text-align:center;
+    border-bottom:7px solid #5f1b2d;
+}}
+
+.header img {{
+    max-width:420px;
+    width:90%;
+}}
+
+.area {{
+    min-height:calc(100vh - 110px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:30px 18px;
+}}
+
+.card {{
+    width:100%;
+    max-width:480px;
+    background:white;
+    padding:38px;
+    border-radius:20px;
+    box-shadow:0 8px 32px rgba(0,0,0,.12);
+}}
+
+h1 {{
+    margin:0 0 8px;
+    color:#5f1b2d;
+    text-align:center;
+    font-weight:400;
+}}
+
+.sub {{
+    text-align:center;
+    color:#888;
+    margin-bottom:28px;
+}}
+
+label {{
+    display:block;
+    margin:15px 0 7px;
+    color:#666;
+    font-weight:bold;
+    font-size:13px;
+}}
+
+input {{
+    width:100%;
+    padding:14px;
+    border:1px solid #d4d4d4;
+    border-radius:9px;
+    font-size:16px;
+}}
+
+button {{
+    width:100%;
+    margin-top:24px;
+    padding:14px;
+    border:0;
+    border-radius:9px;
+    background:#c09761;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<header class="header">
+
+<img
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+    alt="Puebla"
+>
+
+</header>
+
+
+<main class="area">
+
+<section class="card">
+
+<h1>
+    Acceso de Clientes
+</h1>
+
+<div class="sub">
+    Sistema de permisos
+</div>
+
+{error_html}
+
+<form
+    method="post"
+    action="/cliente/login"
+>
+
+<label>
+    Usuario
+</label>
+
+<input
+    type="text"
+    name="username"
+    autocomplete="username"
+    required
+>
+
+
+<label>
+    Contraseña
+</label>
+
+<input
+    type="password"
+    name="password"
+    autocomplete="current-password"
+    required
+>
+
+
+<button type="submit">
+    Ingresar
+</button>
+
+</form>
+
+</section>
+
+</main>
+
+</body>
+</html>
+""")
+
+
+@app.post("/cliente/login")
+async def cliente_login_post(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...)
+):
+
+    try:
+
+        usuario = (
+            username
+            .strip()
+            .upper()
+        )
+
+        resp = (
+            supabase_admin
+            .table("clientes_permisos")
+            .select(
+                "id,usuario,nombre,password_hash,"
+                "activo,permisos_asignados,permisos_usados"
+            )
+            .eq("usuario", usuario)
+            .limit(1)
+            .execute()
+        )
+
+        if not resp.data:
+
+            return RedirectResponse(
+                "/cliente/login?error=1",
+                status_code=303
+            )
+
+        cliente = resp.data[0]
+
+        if not cliente.get("activo", False):
+
+            return RedirectResponse(
+                "/cliente/login?error=1",
+                status_code=303
+            )
+
+        password_correcta = (
+            verificar_password_cliente(
+                password,
+                cliente["password_hash"]
+            )
+        )
+
+        if not password_correcta:
+
+            return RedirectResponse(
+                "/cliente/login?error=1",
+                status_code=303
+            )
+
+        # Limpiar cualquier sesión anterior
+        request.session.clear()
+
+        # Crear sesión del cliente
+        request.session["cliente_id"] = cliente["id"]
+        request.session["cliente_usuario"] = cliente["usuario"]
+        request.session["cliente_nombre"] = (
+            cliente.get("nombre")
+            or cliente["usuario"]
+        )
+
+        # Guardar último acceso
+        supabase_admin.table(
+            "clientes_permisos"
+        ).update({
+            "ultimo_acceso":
+                datetime.now(
+                    ZoneInfo(TZ)
+                ).isoformat()
+        }).eq(
+            "id",
+            cliente["id"]
+        ).execute()
+
+        return RedirectResponse(
+            "/cliente",
+            status_code=303
+        )
+
+    except Exception as e:
+
+        print(
+            "[LOGIN CLIENTE]",
+            e
+        )
+
+        return RedirectResponse(
+            "/cliente/login?error=1",
+            status_code=303
+        )
+
+
+@app.get("/cliente/logout")
+async def cliente_logout(
+    request: Request
+):
+
+    request.session.clear()
+
+    return RedirectResponse(
+        "/cliente/login",
+        status_code=302
+    )
+
+# ============================================================
+# PANEL INICIAL DE CLIENTE
+# ============================================================
+
+@app.get("/cliente", response_class=HTMLResponse)
+async def cliente_panel(request: Request):
+
+    cliente_id = request.session.get(
+        "cliente_id"
+    )
+
+    if not cliente_id:
+
+        return RedirectResponse(
+            "/cliente/login",
+            status_code=302
+        )
+
+    try:
+
+        resp = (
+            supabase_admin
+            .table("clientes_permisos")
+            .select(
+                "id,usuario,nombre,activo,"
+                "permisos_asignados,permisos_usados"
+            )
+            .eq(
+                "id",
+                cliente_id
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if not resp.data:
+
+            request.session.clear()
+
+            return RedirectResponse(
+                "/cliente/login",
+                status_code=302
+            )
+
+        cliente = resp.data[0]
+
+        if not cliente.get(
+            "activo",
+            False
+        ):
+
+            request.session.clear()
+
+            return RedirectResponse(
+                "/cliente/login",
+                status_code=302
+            )
+
+        asignados = int(
+            cliente.get(
+                "permisos_asignados",
+                0
+            )
+            or 0
+        )
+
+        usados = int(
+            cliente.get(
+                "permisos_usados",
+                0
+            )
+            or 0
+        )
+
+        restantes = max(
+            0,
+            asignados - usados
+        )
+
+        nombre = html_lib.escape(
+            str(
+                cliente.get("nombre")
+                or cliente.get("usuario")
+                or ""
+            )
+        )
+
+        usuario = html_lib.escape(
+            str(
+                cliente.get(
+                    "usuario",
+                    ""
+                )
+            )
+        )
+
+        return HTMLResponse(f"""
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>Panel de cliente</title>
+
+<style>
+
+body {{
+    margin:0;
+    background:#f4f4f4;
+    font-family:Arial,sans-serif;
+    color:#555;
+}}
+
+.header {{
+    background:#5f1b2d;
+    color:white;
+    padding:18px 22px;
+}}
+
+.contenido {{
+    max-width:900px;
+    margin:40px auto;
+    padding:0 18px;
+}}
+
+.card {{
+    background:white;
+    border-radius:18px;
+    padding:30px;
+    box-shadow:0 6px 25px rgba(0,0,0,.1);
+}}
+
+h1 {{
+    color:#5f1b2d;
+    margin-top:0;
+}}
+
+.stats {{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-top:25px;
+}}
+
+.stat {{
+    background:#f6f6f6;
+    padding:20px;
+    border-radius:12px;
+    border-left:4px solid #c09761;
+}}
+
+.stat span {{
+    display:block;
+    color:#888;
+    font-size:12px;
+    text-transform:uppercase;
+}}
+
+.stat strong {{
+    display:block;
+    color:#5f1b2d;
+    font-size:28px;
+    margin-top:7px;
+}}
+
+.salir {{
+    display:inline-block;
+    margin-top:25px;
+    color:#5f1b2d;
+}}
+
+@media(max-width:600px) {{
+
+    .stats {{
+        grid-template-columns:1fr;
+    }}
+
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<header class="header">
+
+<strong>
+    Sistema de Clientes
+</strong>
+
+</header>
+
+
+<main class="contenido">
+
+<section class="card">
+
+<h1>
+    Bienvenido, {nombre}
+</h1>
+
+<p>
+    Usuario: <strong>{usuario}</strong>
+</p>
+
+<div class="stats">
+
+<div class="stat">
+
+<span>
+    Permisos asignados
+</span>
+
+<strong>
+    {asignados}
+</strong>
+
+</div>
+
+
+<div class="stat">
+
+<span>
+    Utilizados
+</span>
+
+<strong>
+    {usados}
+</strong>
+
+</div>
+
+
+<div class="stat">
+
+<span>
+    Disponibles
+</span>
+
+<strong>
+    {restantes}
+</strong>
+
+</div>
+
+</div>
+
+
+<a
+    class="salir"
+    href="/cliente/logout"
+>
+    Cerrar sesión
+</a>
+
+</section>
+
+</main>
+
+</body>
+</html>
+""")
+
+    except Exception as e:
+
+        print(
+            "[PANEL CLIENTE]",
+            e
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Error cargando cliente"
+        )
+
+        
 @app.post("/admin/crear")
 async def crear_permiso_post(request: Request):
 
