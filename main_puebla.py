@@ -8226,11 +8226,11 @@ async def admin_crear_usuario(
             )
 
 
-        existe = (
-            supabase
-            .table(
-                "clientes_permisos"
-            )
+            existe = (
+    supabase_admin
+    .table(
+        "clientes_permisos"
+    )
             .select("id")
             .eq(
                 "usuario",
@@ -8261,9 +8261,10 @@ async def admin_crear_usuario(
 
 
         resp = (
-            supabase
-            .table(
-                "clientes_permisos"
+    supabase_admin
+    .table(
+        "clientes_permisos"
+    )
             )
             .insert(
                 {
