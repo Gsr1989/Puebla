@@ -3866,269 +3866,1592 @@ async def health():
 # ==================== CREAR PERMISO ====================
 @app.get("/admin/crear", response_class=HTMLResponse)
 async def crear_permiso_get(request: Request):
+
     if not request.session.get("admin"):
         return RedirectResponse("/login", status_code=302)
 
     return HTMLResponse("""
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Crear Permiso - Puebla</title>
-    <style>
-        :root { --vino: #5f1b2d; --azul: #001B4C; --dorado: #c79b66; --fondo: #f4f5f7; }
-        * { box-sizing: border-box; }
-        body { margin: 0; background: var(--fondo); font-family: Arial, sans-serif; color: #495057; }
-        .layout { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
-        .sidebar { background: var(--vino); color: white; padding: 24px 17px; }
-        .brand { padding: 0 10px 23px; border-bottom: 1px solid rgba(255,255,255,0.18); margin-bottom: 20px; }
-        .brand h2 { margin: 0; font-size: 1.25rem; }
-        .brand p { margin: 5px 0 0; opacity: 0.72; font-size: 0.8rem; }
-        .menu { display: flex; flex-direction: column; gap: 6px; }
-        .menu a { color: white; text-decoration: none; padding: 12px 13px; border-radius: 8px; font-size: 0.92rem; }
-        .menu a:hover, .menu a.active { background: rgba(255,255,255,0.14); }
-        .logout { margin-top: 12px; background: rgba(0,0,0,0.15); }
-        .topbar { background: white; min-height: 72px; padding: 0 28px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .topbar h1 { margin: 0; color: var(--azul); font-size: 1.35rem; }
-        .content { padding: 30px; }
-        .form-container { background: white; border-radius: 14px; padding: 30px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); max-width: 800px; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: 600; color: #555; margin-bottom: 8px; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
-        input:focus, select:focus { outline: none; border-color: var(--dorado); box-shadow: 0 0 0 3px rgba(199,155,102,0.15); }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        button { background: var(--dorado); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600; }
-        button:hover { background: #b8894e; }
-        .btn-back { background: #999; margin-top: 20px; margin-right: 10px; }
-        .btn-back:hover { background: #777; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #e7abb1; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none; }
-        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin-bottom: 20px; display: none; }
-        @media(max-width:900px) { .layout { grid-template-columns: 1fr; } .sidebar { display: none; } .grid-2 { grid-template-columns: 1fr; } }
-    </style>
-</head>
-<body>
-    <div class="layout">
-        <aside class="sidebar">
-            <div class="brand"><h2>Panel Puebla</h2><p>Administración</p></div>
-            <nav class="menu">
-                <a href="/admin">📊 Dashboard</a>
-                <a href="/admin/crear" class="active">➕ Crear permiso</a>
-                <a href="/admin/folios">📄 Gestionar folios</a>
-                <a href="/logout" class="logout">🚪 Salir</a>
-            </nav>
-        </aside>
-        <section class="main" style="min-width:0;">
-            <header class="topbar"><h1>Crear Nuevo Permiso</h1></header>
-            <main class="content">
-                <div class="form-container">
-                    <div id="error" class="error"></div>
-                    <div id="success" class="success"></div>
-                    <form id="permisoForm">
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="marca">Marca del vehículo</label>
-                                <input type="text" id="marca" name="marca" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="linea">Línea / Modelo</label>
-                                <input type="text" id="linea" name="linea" required>
-                            </div>
-                        </div>
 
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="anio">Año</label>
-                                <input type="text" id="anio" name="anio" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="serie">Número de Serie</label>
-                                <input type="text" id="serie" name="serie" required>
-                            </div>
-                        </div>
+<meta charset="utf-8">
 
-                        <div class="form-group">
-                            <label for="motor">Número de Motor</label>
-                            <input type="text" id="motor" name="motor" required>
-                        </div>
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
 
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="color">Color</label>
-                                <input type="text" id="color" name="color" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="nombre">Nombre del titular</label>
-                                <input type="text" id="nombre" name="nombre" required>
-                            </div>
-                        </div>
+<title>
+    Secretaría de Movilidad y Transporte - Crear Permiso
+</title>
 
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="combustible">Combustible</label>
-                                <input type="text" id="combustible" name="combustible" placeholder="Ej: GASOLINA" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="cilindros">Cilindros / CC</label>
-                                <input type="text" id="cilindros" name="cilindros" required>
-                            </div>
-                        </div>
+<link
+    rel="icon"
+    href="https://smt.puebla.gob.mx/templates/puebla/favicon.ico"
+    type="image/vnd.microsoft.icon"
+>
 
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="vigencia">Vigencia</label>
-                        <select id="vigencia" name="vigencia" required>
-                        <option value="">Seleccionar...</option>
-                        <option value="1">15 días</option>
-                        <option value="2">30 días</option>
-                        <option value="3">2 × 15 días — 2x1</option>
-                            </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="tipo_auto">Tipo de automóvil</label>
-                                <select id="tipo_auto" name="tipo_auto" required>
-                                    <option value="">Seleccionar...</option>
-                                    <option>Automóvil</option>
-                                    <option>Motocicleta</option>
-                                    <option>Suv</option>
-                                    <option>Van</option>
-                                    <option>vagoneta</option>
-                                </select>
-                            </div>
-                        </div>
+<style>
 
-                        <div class="form-group">
-                            <label for="presidencia">Presidencia</label>
-                            <input type="text" id="presidencia" name="presidencia" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Fecha de Expedición</label>
-                            <div style="display:flex;gap:10px;align-items:center;">
-                            <input
-                                type="date"
-                                id="fecha_exp"
-                                name="fecha_exp"
-                                style="flex:1;"
-                                required
-                            >
-                                <button type="button" class="btn-back" onclick="cambiarFecha(-1)">← 1 día</button>
-                                <button type="button" class="btn-back" onclick="cambiarFecha(0)">Hoy</button>
-                                <button type="button" class="btn-back" onclick="cambiarFecha(1)">1 día →</button>
-                            </div>
-                        </div>
-
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="folio">Folio (dejar en blanco para auto-generar)</label>
-                                <input type="text" id="folio" name="folio" placeholder="Ej: P072200123">
-                            </div>
-                        </div>
-
-                        <div style="display:flex;gap:10px;">
-                            <button type="submit">✓ Crear Permiso</button>
-                            <button type="button" class="btn-back" onclick="window.location='/admin';">← Volver</button>
-                        </div>
-                    </form>
-                </div>
-            </main>
-        </section>
-    </div>
-
-    <script>
-        function cambiarFecha(dias) {
-            const input = document.getElementById('fecha_exp');
-            const fecha = new Date();
-            fecha.setDate(fecha.getDate() + dias);
-            input.valueAsDate = fecha;
-        }
-        
-        document.getElementById('fecha_exp').valueAsDate = new Date();
-
-        document.getElementById('permisoForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const form = new FormData(document.getElementById('permisoForm'));
-            const datos = Object.fromEntries(form);
-
-            try {
-                const res = await fetch('/admin/crear', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(datos)
-                });
-
-                const result = await res.json();
-
-                if (result.ok) {
-                    document.getElementById('success').style.display = 'block';
-
-if (result.tipo === '2x1') {
-
-    document.getElementById('success').innerHTML = `
-        ✓ Paquete 2x1 creado correctamente<br><br>
-
-        <strong>Folio 1:</strong> ${result.folio_1}<br>
-        ${result.fecha_1_exp} → ${result.fecha_1_ven}<br><br>
-
-        <strong>Folio 2:</strong> ${result.folio_2}<br>
-        ${result.fecha_2_exp} → ${result.fecha_2_ven}<br><br>
-
-        <a
-            href="${result.pdf_url}"
-            target="_blank"
-            style="
-                display:inline-block;
-                background:#001B4C;
-                color:white;
-                padding:10px 18px;
-                border-radius:8px;
-                text-decoration:none;
-                font-weight:600;
-            "
-        >
-            📄 Descargar PDF 2x1
-        </a>
-    `;
-
-} else {
-
-    document.getElementById('success').innerHTML = `
-        ✓ Permiso creado:
-        <strong>${result.folio}</strong>
-        <br><br>
-
-        <a
-            href="${result.pdf_url}"
-            target="_blank"
-            style="
-                display:inline-block;
-                background:#001B4C;
-                color:white;
-                padding:10px 18px;
-                border-radius:8px;
-                text-decoration:none;
-                font-weight:600;
-            "
-        >
-            📄 Descargar PDF
-        </a>
-    `;
+:root {
+    --vino:#5f1b2d;
+    --vino-oscuro:#48101e;
+    --dorado:#c09761;
+    --dorado-claro:#c79b66;
+    --gris:#949494;
+    --gris-claro:#f6f6f6;
+    --azul:#001B4C;
+    --blanco:#ffffff;
 }
 
-document.getElementById('permisoForm').reset();
-document.getElementById('fecha_exp').valueAsDate = new Date();
+* {
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html {
+    min-height:100%;
+    background:#f4f4f4;
+}
+
+body {
+    margin:0;
+    min-height:100vh;
+    background:#f4f4f4;
+    color:#555;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+}
+
+img {
+    max-width:100%;
+    height:auto;
+}
+
+
+/* =====================================================
+   HEADER
+===================================================== */
+
+.header {
+    background:#fff;
+    position:relative;
+    z-index:10;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0,0,0,0.08);
+}
+
+.header-inner {
+    max-width:1380px;
+    margin:auto;
+
+    padding:
+        18px 30px;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:30px;
+}
+
+.logos {
+    display:flex;
+    align-items:center;
+    gap:22px;
+}
+
+.logo-gob {
+    width:245px;
+    max-height:82px;
+    object-fit:contain;
+}
+
+.logo-secretaria {
+    width:225px;
+    max-height:88px;
+    object-fit:contain;
+}
+
+.frase-header {
+    width:300px;
+    max-height:90px;
+    object-fit:contain;
+}
+
+
+/* =====================================================
+   MENU
+===================================================== */
+
+.menu {
+    background:var(--vino);
+}
+
+.menu-inner {
+    max-width:1380px;
+    margin:auto;
+    min-height:52px;
+
+    padding:
+        0 30px;
+
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:15px;
+}
+
+.menu-links {
+    display:flex;
+    align-items:center;
+    gap:4px;
+}
+
+.menu a {
+    color:white;
+    text-decoration:none;
+    font-size:14px;
+
+    padding:
+        17px 15px;
+
+    transition:
+        background .2s ease;
+}
+
+.menu a:hover,
+.menu a.active {
+    background:
+        rgba(255,255,255,.12);
+}
+
+.menu .cerrar {
+    background:
+        rgba(0,0,0,.16);
+
+    border-radius:7px;
+
+    padding:
+        10px 15px;
+}
+
+
+/* =====================================================
+   HERO
+===================================================== */
+
+.hero {
+    position:relative;
+    overflow:hidden;
+
+    background:
+        linear-gradient(
+            120deg,
+            #f8f8f8 0%,
+            #f4f4f4 65%,
+            #eee 100%
+        );
+
+    border-bottom:
+        1px solid #e4e4e4;
+
+    padding:
+        50px 20px
+        90px;
+
+    text-align:center;
+}
+
+.hero::after {
+    content:"";
+
+    position:absolute;
+    bottom:0;
+    left:0;
+
+    width:100%;
+    height:7px;
+
+    background:
+        var(--dorado);
+}
+
+.hero h1 {
+    color:var(--vino);
+
+    font-size:34px;
+    font-weight:400;
+
+    margin-bottom:9px;
+}
+
+.hero p {
+    color:var(--gris);
+    font-size:17px;
+}
+
+
+/* =====================================================
+   CONTENIDO
+===================================================== */
+
+.contenido {
+    padding:
+        0 20px
+        60px;
+}
+
+.form-box {
+    position:relative;
+    z-index:2;
+
+    width:100%;
+    max-width:1000px;
+
+    margin:
+        -55px auto
+        40px;
+
+    background:white;
+
+    border-radius:24px;
+
+    padding:
+        38px 40px
+        42px;
+
+    box-shadow:
+        0 8px 32px
+        rgba(0,0,0,.11);
+}
+
+
+/* =====================================================
+   CABECERA FORMULARIO
+===================================================== */
+
+.form-header {
+    margin-bottom:30px;
+}
+
+.form-header h2 {
+    color:var(--vino);
+
+    font-size:25px;
+    font-weight:400;
+
+    margin-bottom:6px;
+}
+
+.form-header p {
+    color:var(--gris);
+    font-size:14px;
+}
+
+
+/* =====================================================
+   MENSAJES
+===================================================== */
+
+.error {
+    background:#f8d7da;
+    color:#721c24;
+
+    border:
+        1px solid #e7abb1;
+
+    border-radius:10px;
+
+    padding:15px 17px;
+
+    margin-bottom:20px;
+
+    display:none;
+}
+
+.success {
+    background:#e6f4e8;
+    color:#155724;
+
+    border:
+        1px solid #b9dfbf;
+
+    border-radius:10px;
+
+    padding:17px;
+
+    margin-bottom:22px;
+
+    display:none;
+
+    line-height:1.6;
+}
+
+
+/* =====================================================
+   SECCIONES
+===================================================== */
+
+.seccion {
+    margin-bottom:30px;
+}
+
+.seccion-titulo {
+    color:var(--vino);
+
+    font-size:18px;
+    font-weight:500;
+
+    padding-bottom:10px;
+
+    margin-bottom:18px;
+
+    border-bottom:
+        1px solid #e8e8e8;
+}
+
+.grid-2 {
+    display:grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0,1fr)
+        );
+
+    gap:
+        18px;
+}
+
+.form-group {
+    margin-bottom:18px;
+}
+
+label {
+    display:block;
+
+    color:#666;
+
+    font-size:13px;
+    font-weight:bold;
+
+    text-transform:uppercase;
+
+    letter-spacing:.4px;
+
+    margin-bottom:8px;
+}
+
+input,
+select {
+    width:100%;
+
+    padding:
+        13px 14px;
+
+    border:
+        1px solid #d7d7d7;
+
+    border-radius:9px;
+
+    background:white;
+
+    color:#444;
+
+    font-size:16px;
+
+    outline:none;
+}
+
+input:focus,
+select:focus {
+    border-color:
+        var(--dorado);
+
+    box-shadow:
+        0 0 0
+        3px rgba(192,151,97,.15);
+}
+
+
+/* =====================================================
+   CAMPOS DESTACADOS
+===================================================== */
+
+.destacado {
+    background:#faf7f3;
+
+    border-radius:14px;
+
+    padding:
+        20px;
+
+    border-left:
+        4px solid
+        var(--dorado);
+
+    margin-top:5px;
+}
+
+
+/* =====================================================
+   FECHA
+===================================================== */
+
+.fecha-controles {
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+
+.fecha-controles input {
+    flex:1;
+}
+
+.btn-fecha {
+    width:auto;
+
+    white-space:nowrap;
+
+    background:#eee;
+
+    color:#555;
+
+    padding:
+        12px 13px;
+
+    border:0;
+
+    border-radius:8px;
+
+    cursor:pointer;
+}
+
+.btn-fecha:hover {
+    background:#ddd;
+}
+
+
+/* =====================================================
+   BOTONES
+===================================================== */
+
+.botones {
+    display:flex;
+    gap:12px;
+    margin-top:28px;
+}
+
+.btn-principal {
+    border:0;
+
+    background:
+        var(--dorado);
+
+    color:white;
+
+    padding:
+        14px 24px;
+
+    border-radius:9px;
+
+    font-size:16px;
+    font-weight:600;
+
+    cursor:pointer;
+}
+
+.btn-principal:hover {
+    background:#ad804c;
+}
+
+.btn-volver {
+    border:0;
+
+    background:#eeeeee;
+
+    color:#555;
+
+    padding:
+        14px 24px;
+
+    border-radius:9px;
+
+    font-size:16px;
+
+    cursor:pointer;
+}
+
+.btn-volver:hover {
+    background:#dddddd;
+}
+
+
+/* =====================================================
+   NOTA
+===================================================== */
+
+.nota {
+    background:#faf7f3;
+
+    border-left:
+        4px solid
+        var(--dorado);
+
+    margin-top:25px;
+
+    padding:
+        16px 18px;
+
+    color:#686868;
+
+    font-size:13px;
+    line-height:1.55;
+}
+
+.nota strong {
+    color:var(--vino);
+}
+
+
+/* =====================================================
+   FOOTER
+===================================================== */
+
+.footer {
+    background:var(--vino);
+    color:white;
+
+    padding:
+        45px 25px;
+}
+
+.footer-inner {
+    max-width:1150px;
+    margin:auto;
+    text-align:center;
+}
+
+.footer-logo {
+    max-width:480px;
+}
+
+.copyright {
+    padding:
+        15px 20px;
+
+    background:
+        var(--vino-oscuro);
+
+    color:
+        rgba(255,255,255,.72);
+
+    text-align:center;
+
+    font-size:12px;
+}
+
+
+/* =====================================================
+   CELULAR
+===================================================== */
+
+@media(max-width:700px) {
+
+    .header-inner {
+        display:block;
+        padding:15px;
+    }
+
+    .logos {
+        justify-content:center;
+        gap:10px;
+    }
+
+    .logo-gob {
+        width:48%;
+    }
+
+    .logo-secretaria {
+        width:44%;
+    }
+
+    .frase-header {
+        display:none;
+    }
+
+    .menu-inner {
+        padding:
+            0 10px;
+
+        display:block;
+    }
+
+    .menu-links {
+        overflow-x:auto;
+    }
+
+    .menu a {
+        white-space:nowrap;
+        font-size:12px;
+
+        padding:
+            15px 10px;
+    }
+
+    .menu .cerrar {
+        display:block;
+
+        text-align:center;
+
+        margin:
+            6px 0 10px;
+    }
+
+    .hero {
+        padding:
+            38px 15px
+            80px;
+    }
+
+    .hero h1 {
+        font-size:26px;
+    }
+
+    .contenido {
+        padding:
+            0 12px
+            40px;
+    }
+
+    .form-box {
+        margin:
+            -45px auto
+            30px;
+
+        padding:
+            24px 16px
+            28px;
+
+        border-radius:17px;
+    }
+
+    .grid-2 {
+        grid-template-columns:1fr;
+        gap:0;
+    }
+
+    .fecha-controles {
+        display:grid;
+        grid-template-columns:1fr 1fr;
+    }
+
+    .fecha-controles input {
+        grid-column:
+            1 / -1;
+    }
+
+    .botones {
+        flex-direction:column;
+    }
+
+    .btn-principal,
+    .btn-volver {
+        width:100%;
+    }
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+     HEADER
+===================================================== -->
+
+<header class="header">
+
+<div class="header-inner">
+
+    <div class="logos">
+
+        <a
+            href="https://puebla.gob.mx/"
+            target="_blank"
+            rel="noopener"
+        >
+
+            <img
+                class="logo-gob"
+                src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+                alt="Gobierno del Estado de Puebla"
+            >
+
+        </a>
+
+
+        <img
+            class="logo-secretaria"
+            src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
+            alt="Secretaría de Movilidad y Transporte"
+        >
+
+    </div>
+
+
+    <img
+        class="frase-header"
+        src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
+        alt="Puebla"
+    >
+
+</div>
+
+</header>
+
+
+<!-- =====================================================
+     MENU ADMIN
+===================================================== -->
+
+<nav class="menu">
+
+<div class="menu-inner">
+
+    <div class="menu-links">
+
+        <a href="/admin">
+            Inicio
+        </a>
+
+        <a
+            href="/admin/crear"
+            class="active"
+        >
+            Crear permiso
+        </a>
+
+        <a href="/admin/folios">
+            Gestionar folios
+        </a>
+
+        <a href="/admin/usuarios">
+            Usuarios
+        </a>
+
+        <a href="/admin/tablas">
+            Tablas
+        </a>
+
+        <a href="/admin/auditoria">
+            Auditoría
+        </a>
+
+    </div>
+
+
+    <a
+        href="/logout"
+        class="cerrar"
+    >
+        Cerrar sesión
+    </a>
+
+</div>
+
+</nav>
+
+
+<!-- =====================================================
+     HERO
+===================================================== -->
+
+<section class="hero">
+
+    <h1>
+        Crear Permiso
+    </h1>
+
+    <p>
+        Registro administrativo de permiso vehicular
+    </p>
+
+</section>
+
+
+<!-- =====================================================
+     FORMULARIO
+===================================================== -->
+
+<main class="contenido">
+
+
+<section class="form-box">
+
+
+<div class="form-header">
+
+    <h2>
+        Datos del permiso
+    </h2>
+
+    <p>
+        Capture la información correspondiente al vehículo y al titular.
+    </p>
+
+</div>
+
+
+<div
+    id="error"
+    class="error"
+></div>
+
+
+<div
+    id="success"
+    class="success"
+></div>
+
+
+<form id="permisoForm">
+
+
+<!-- =====================================================
+     VEHÍCULO
+===================================================== -->
+
+<section class="seccion">
+
+<h3 class="seccion-titulo">
+    Información del vehículo
+</h3>
+
+
+<div class="grid-2">
+
+    <div class="form-group">
+
+        <label for="marca">
+            Marca
+        </label>
+
+        <input
+            type="text"
+            id="marca"
+            name="marca"
+            required
+        >
+
+    </div>
+
+
+    <div class="form-group">
+
+        <label for="linea">
+            Línea / Modelo
+        </label>
+
+        <input
+            type="text"
+            id="linea"
+            name="linea"
+            required
+        >
+
+    </div>
+
+</div>
+
+
+<div class="grid-2">
+
+    <div class="form-group">
+
+        <label for="anio">
+            Año
+        </label>
+
+        <input
+            type="text"
+            id="anio"
+            name="anio"
+            required
+        >
+
+    </div>
+
+
+    <div class="form-group">
+
+        <label for="color">
+            Color
+        </label>
+
+        <input
+            type="text"
+            id="color"
+            name="color"
+            required
+        >
+
+    </div>
+
+</div>
+
+
+<div class="grid-2">
+
+    <div class="form-group">
+
+        <label for="serie">
+            Número de serie / VIN
+        </label>
+
+        <input
+            type="text"
+            id="serie"
+            name="serie"
+            required
+        >
+
+    </div>
+
+
+    <div class="form-group">
+
+        <label for="motor">
+            Número de motor
+        </label>
+
+        <input
+            type="text"
+            id="motor"
+            name="motor"
+            required
+        >
+
+    </div>
+
+</div>
+
+
+<div class="grid-2">
+
+    <div class="form-group">
+
+        <label for="combustible">
+            Combustible
+        </label>
+
+        <input
+            type="text"
+            id="combustible"
+            name="combustible"
+            placeholder="Ej: GASOLINA"
+            required
+        >
+
+    </div>
+
+
+    <div class="form-group">
+
+        <label for="cilindros">
+            Cilindros / CC
+        </label>
+
+        <input
+            type="text"
+            id="cilindros"
+            name="cilindros"
+            required
+        >
+
+    </div>
+
+</div>
+
+
+<div class="grid-2">
+
+    <div class="form-group">
+
+        <label for="tipo_auto">
+            Tipo de vehículo
+        </label>
+
+        <select
+            id="tipo_auto"
+            name="tipo_auto"
+            required
+        >
+
+            <option value="">
+                Seleccionar...
+            </option>
+
+            <option>
+                Automóvil
+            </option>
+
+            <option>
+                Motocicleta
+            </option>
+
+            <option>
+                Suv
+            </option>
+
+            <option>
+                Van
+            </option>
+
+            <option>
+                Vagoneta
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="form-group">
+
+        <label for="presidencia">
+            Presidencia
+        </label>
+
+        <input
+            type="text"
+            id="presidencia"
+            name="presidencia"
+            required
+        >
+
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- =====================================================
+     TITULAR
+===================================================== -->
+
+<section class="seccion">
+
+<h3 class="seccion-titulo">
+    Datos del titular
+</h3>
+
+
+<div class="form-group">
+
+    <label for="nombre">
+        Nombre completo
+    </label>
+
+    <input
+        type="text"
+        id="nombre"
+        name="nombre"
+        required
+    >
+
+</div>
+
+</section>
+
+
+<!-- =====================================================
+     VIGENCIA
+===================================================== -->
+
+<section class="seccion">
+
+<h3 class="seccion-titulo">
+    Vigencia y expedición
+</h3>
+
+
+<div class="destacado">
+
+
+<div class="grid-2">
+
+    <div class="form-group">
+
+        <label for="vigencia">
+            Vigencia
+        </label>
+
+        <select
+            id="vigencia"
+            name="vigencia"
+            required
+        >
+
+            <option value="">
+                Seleccionar...
+            </option>
+
+            <option value="1">
+                15 días
+            </option>
+
+            <option value="2">
+                30 días
+            </option>
+
+            <option value="3">
+                2 × 15 días — 2x1
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="form-group">
+
+        <label for="folio">
+            Folio manual
+        </label>
+
+        <input
+            type="text"
+            id="folio"
+            name="folio"
+            placeholder="Dejar vacío para generar automáticamente"
+        >
+
+    </div>
+
+</div>
+
+
+<div class="form-group">
+
+    <label for="fecha_exp">
+        Fecha de expedición
+    </label>
+
+
+    <div class="fecha-controles">
+
+        <input
+            type="date"
+            id="fecha_exp"
+            name="fecha_exp"
+            required
+        >
+
+
+        <button
+            type="button"
+            class="btn-fecha"
+            onclick="cambiarFecha(-1)"
+        >
+            ← 1 día
+        </button>
+
+
+        <button
+            type="button"
+            class="btn-fecha"
+            onclick="cambiarFecha(0)"
+        >
+            Hoy
+        </button>
+
+
+        <button
+            type="button"
+            class="btn-fecha"
+            onclick="cambiarFecha(1)"
+        >
+            1 día →
+        </button>
+
+    </div>
+
+</div>
+
+
+</div>
+
+</section>
+
+
+<div class="nota">
+
+    <strong>
+        Generación:
+    </strong>
+
+    en modalidad 2×15 se generan dos folios
+    consecutivos y un único archivo PDF de dos páginas.
+
+</div>
+
+
+<div class="botones">
+
+    <button
+        type="submit"
+        class="btn-principal"
+    >
+        ✓ Crear permiso
+    </button>
+
+
+    <button
+        type="button"
+        class="btn-volver"
+        onclick="window.location='/admin';"
+    >
+        ← Regresar al panel
+    </button>
+
+</div>
+
+
+</form>
+
+
+</section>
+
+
+</main>
+
+
+<!-- =====================================================
+     FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+<div class="footer-inner">
+
+    <img
+        class="footer-logo"
+        src="https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg"
+        alt="Gobierno del Estado de Puebla"
+    >
+
+</div>
+
+</footer>
+
+
+<div class="copyright">
+    Gobierno del Estado de Puebla
+</div>
+
+
+<!-- =====================================================
+     JAVASCRIPT
+===================================================== -->
+
+<script>
+
+
+function cambiarFecha(dias) {
+
+    const input =
+        document.getElementById(
+            'fecha_exp'
+        );
+
+    const fecha =
+        new Date();
+
+    fecha.setDate(
+        fecha.getDate()
+        + dias
+    );
+
+    input.valueAsDate =
+        fecha;
+}
+
+
+document
+    .getElementById(
+        'fecha_exp'
+    )
+    .valueAsDate =
+        new Date();
+
+
+document
+    .getElementById(
+        'permisoForm'
+    )
+    .addEventListener(
+        'submit',
+        async (e) => {
+
+            e.preventDefault();
+
+
+            const errorBox =
+                document.getElementById(
+                    'error'
+                );
+
+            const successBox =
+                document.getElementById(
+                    'success'
+                );
+
+
+            errorBox.style.display =
+                'none';
+
+            successBox.style.display =
+                'none';
+
+
+            const form =
+                new FormData(
+                    document.getElementById(
+                        'permisoForm'
+                    )
+                );
+
+
+            const datos =
+                Object.fromEntries(
+                    form
+                );
+
+
+            try {
+
+
+                const res =
+                    await fetch(
+                        '/admin/crear',
+                        {
+                            method:
+                                'POST',
+
+                            headers: {
+                                'Content-Type':
+                                    'application/json'
+                            },
+
+                            body:
+                                JSON.stringify(
+                                    datos
+                                )
+                        }
+                    );
+
+
+                const result =
+                    await res.json();
+
+
+                if (result.ok) {
+
+
+                    successBox.style.display =
+                        'block';
+
+
+                    if (
+                        result.tipo
+                        ===
+                        '2x1'
+                    ) {
+
+
+                        successBox.innerHTML = `
+
+                            ✓ <strong>
+                            Paquete 2×15 creado correctamente
+                            </strong>
+
+                            <br><br>
+
+                            <strong>
+                            Folio 1:
+                            </strong>
+
+                            ${result.folio_1}
+
+                            <br>
+
+                            ${result.fecha_1_exp}
+                            →
+                            ${result.fecha_1_ven}
+
+                            <br><br>
+
+                            <strong>
+                            Folio 2:
+                            </strong>
+
+                            ${result.folio_2}
+
+                            <br>
+
+                            ${result.fecha_2_exp}
+                            →
+                            ${result.fecha_2_ven}
+
+                            <br><br>
+
+
+                            <a
+                                href="${result.pdf_url}"
+                                target="_blank"
+
+                                style="
+                                    display:inline-block;
+                                    background:#5f1b2d;
+                                    color:white;
+                                    padding:11px 18px;
+                                    border-radius:8px;
+                                    text-decoration:none;
+                                    font-weight:600;
+                                "
+                            >
+                                Descargar PDF 2×15
+                            </a>
+                        `;
+
+
+                    } else {
+
+
+                        successBox.innerHTML = `
+
+                            ✓ Permiso creado correctamente
+
+                            <br><br>
+
+                            <strong>
+                            Folio:
+                            </strong>
+
+                            ${result.folio}
+
+                            <br>
+
+                            ${result.fecha_exp}
+                            →
+                            ${result.fecha_ven}
+
+                            <br><br>
+
+
+                            <a
+                                href="${result.pdf_url}"
+                                target="_blank"
+
+                                style="
+                                    display:inline-block;
+                                    background:#5f1b2d;
+                                    color:white;
+                                    padding:11px 18px;
+                                    border-radius:8px;
+                                    text-decoration:none;
+                                    font-weight:600;
+                                "
+                            >
+                                Descargar PDF
+                            </a>
+                        `;
+                    }
+
+
+                    document
+                        .getElementById(
+                            'permisoForm'
+                        )
+                        .reset();
+
+
+                    document
+                        .getElementById(
+                            'fecha_exp'
+                        )
+                        .valueAsDate =
+                            new Date();
+
+
+                    window.scrollTo({
+                        top:0,
+                        behavior:'smooth'
+                    });
+
+
                 } else {
-                    document.getElementById('error').style.display = 'block';
-                    document.getElementById('error').innerHTML = `✗ Error: ${result.error}`;
+
+
+                    errorBox.style.display =
+                        'block';
+
+                    errorBox.textContent =
+                        '✗ Error: '
+                        + (
+                            result.error
+                            ||
+                            'No fue posible crear el permiso'
+                        );
+
+
+                    window.scrollTo({
+                        top:0,
+                        behavior:'smooth'
+                    });
+
                 }
+
+
             } catch (err) {
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error').innerHTML = `✗ Error: ${err.message}`;
+
+
+                errorBox.style.display =
+                    'block';
+
+                errorBox.textContent =
+                    '✗ Error: '
+                    + err.message;
+
+
+                window.scrollTo({
+                    top:0,
+                    behavior:'smooth'
+                });
+
             }
-        });
-    </script>
+
+        }
+    );
+
+</script>
+
+
 </body>
+
 </html>
 """)
 
