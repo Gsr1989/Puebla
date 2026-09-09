@@ -8117,6 +8117,182 @@ async def gestionar_folios(request: Request):
 </html>
 """)
 
+@app.post("/admin/usuarios/crear")
+async def admin_crear_usuario(
+    request: Request
+):
+
+    if not request.session.get("admin"):
+
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "Sesión no válida"
+            },
+            status_code=401
+        )
+
+    try:
+
+        datos = await request.json()
+
+        usuario = (
+            str(
+                datos.get(
+                    "usuario",
+                    ""
+                )
+            )
+            .strip()
+            .upper()
+        )
+
+        nombre = (
+            str(
+                datos.get(
+                    "nombre",
+                    ""
+                )
+            )
+            .strip()
+        )
+
+        password = str(
+            datos.get(
+                "password",
+                ""
+            )
+        )
+
+        permisos = int(
+            datos.get(
+                "permisos",
+                0
+            )
+        )
+
+
+        if not usuario:
+
+            raise ValueError(
+                "Debes escribir un usuario"
+            )
+
+
+        if len(usuario) < 3:
+
+            raise ValueError(
+                "El usuario debe tener mínimo 3 caracteres"
+            )
+
+
+        if len(password) < 6:
+
+            raise ValueError(
+                "La contraseña debe tener mínimo 6 caracteres"
+            )
+
+
+        if permisos < 0:
+
+            raise ValueError(
+                "Los permisos no pueden ser negativos"
+            )
+
+
+        if permisos > 1_000_000:
+
+            raise ValueError(
+                "Cantidad de permisos demasiado grande"
+            )
+
+
+        existe = (
+            supabase
+            .table(
+                "clientes_permisos"
+            )
+            .select("id")
+            .eq(
+                "usuario",
+                usuario
+            )
+            .limit(1)
+            .execute()
+        )
+
+
+        if existe.data:
+
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error":
+                        "Ese usuario ya existe"
+                },
+                status_code=409
+            )
+
+
+        password_hash = (
+            crear_password_hash(
+                password
+            )
+        )
+
+
+        resp = (
+            supabase
+            .table(
+                "clientes_permisos"
+            )
+            .insert(
+                {
+                    "usuario":
+                        usuario,
+
+                    "nombre":
+                        nombre,
+
+                    "password_hash":
+                        password_hash,
+
+                    "activo":
+                        True,
+
+                    "permisos_asignados":
+                        permisos,
+
+                    "permisos_usados":
+                        0
+                }
+            )
+            .execute()
+        )
+
+
+        return {
+            "ok": True,
+            "cliente":
+                resp.data
+        }
+
+
+    except Exception as e:
+
+        print(
+            "[CREAR CLIENTE]",
+            e
+        )
+
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": str(e)
+            },
+            status_code=400
+    )
+    
 @app.get("/admin/api/folios")
 async def api_get_folios(request: Request):
     if not request.session.get("admin"):
