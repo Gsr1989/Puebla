@@ -6161,8 +6161,8 @@ async def admin_usuarios(request: Request):
     try:
 
         resp = (
-            supabase
-            .table("clientes_permisos")
+    supabase_admin
+    .table("clientes_permisos")
             .select("*")
             .order(
                 "creado_en",
