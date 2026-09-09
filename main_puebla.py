@@ -330,6 +330,87 @@ class PermisoForm(StatesGroup):
     tipo_auto = State()
     presidencia = State()
 
+
+# ============================================================
+# PASSWORDS DE CLIENTES
+# ============================================================
+
+def crear_password_hash(password: str) -> str:
+
+    password = str(password).strip()
+
+    if len(password) < 6:
+        raise ValueError(
+            "La contraseña debe tener mínimo 6 caracteres"
+        )
+
+    iteraciones = 310_000
+
+    salt = secrets.token_bytes(16)
+
+    resultado = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        iteraciones
+    )
+
+    salt_b64 = base64.b64encode(
+        salt
+    ).decode("utf-8")
+
+    hash_b64 = base64.b64encode(
+        resultado
+    ).decode("utf-8")
+
+    return (
+        f"pbkdf2_sha256$"
+        f"{iteraciones}$"
+        f"{salt_b64}$"
+        f"{hash_b64}"
+    )
+
+
+def verificar_password_cliente(
+    password: str,
+    password_hash: str
+) -> bool:
+
+    try:
+
+        metodo, iteraciones, salt_b64, hash_b64 = (
+            password_hash.split("$", 3)
+        )
+
+        if metodo != "pbkdf2_sha256":
+            return False
+
+        iteraciones = int(iteraciones)
+
+        salt = base64.b64decode(
+            salt_b64
+        )
+
+        hash_guardado = base64.b64decode(
+            hash_b64
+        )
+
+        hash_nuevo = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt,
+            iteraciones
+        )
+
+        return hmac.compare_digest(
+            hash_guardado,
+            hash_nuevo
+        )
+
+    except Exception:
+
+        return False
+        
 # ==================== BOT ====================
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message, state: FSMContext):
