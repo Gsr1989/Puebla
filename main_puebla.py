@@ -34,13 +34,21 @@ import aiohttp
 from urllib.parse import quote
 
 # ==================== CONFIG ====================
+
 BOT_TOKEN = os.getenv("BOT_TOKEN_PUEBLA", "")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 
+# Conexión normal / pública
 supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
+
+# Conexión administrativa
+supabase_admin = create_client(
     SUPABASE_URL,
     SUPABASE_SERVICE_KEY
 )
@@ -67,7 +75,6 @@ if not SECRET_KEY:
     SECRET_KEY = os.urandom(32).hex()
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 bot     = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
