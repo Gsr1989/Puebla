@@ -519,7 +519,8 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     same_site="lax",
-    https_only=True
+    https_only=True,
+    max_age=1800
 )
 
 @app.post("/webhook")
