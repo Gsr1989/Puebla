@@ -1076,7 +1076,12 @@ async def admin_panel(request: Request):
     if not request.session.get("admin"):
         return RedirectResponse("/login", status_code=302)
 
+    # ==========================================================
+    # LEER INFORMACIÓN DEL SISTEMA
+    # ==========================================================
+
     try:
+
         resp = (
             supabase
             .table("folios_registrados")
@@ -1087,21 +1092,38 @@ async def admin_panel(request: Request):
 
         registros = resp.data or []
 
+        supabase_estado = "Conectado"
+        supabase_clase = "ok"
+
     except Exception as e:
+
         print(f"[ADMIN] Error leyendo folios: {e}")
+
         registros = []
+
+        supabase_estado = "Sin conexión"
+        supabase_clase = "error-status"
 
     total = len(registros)
 
-    hoy = datetime.now(ZoneInfo(TZ)).date()
+    hoy = datetime.now(
+        ZoneInfo(TZ)
+    ).date()
 
     vigentes = 0
     vencidos = 0
 
     for row in registros:
+
         try:
+
             fv = datetime.fromisoformat(
-                str(row["fecha_vencimiento"]).replace("Z", "+00:00")
+                str(
+                    row["fecha_vencimiento"]
+                ).replace(
+                    "Z",
+                    "+00:00"
+                )
             ).date()
 
             if hoy <= fv:
@@ -1114,425 +1136,1403 @@ async def admin_panel(request: Request):
 
     timers = len(timers_activos)
 
-    siguiente = f"{FOLIO_NUM_PREFIJO}{_folio_counter['siguiente']}"
+    siguiente = (
+        f"{FOLIO_NUM_PREFIJO}"
+        f"{_folio_counter['siguiente']}"
+    )
 
     username = html_lib.escape(
-        str(request.session.get("username", "Admin"))
+        str(
+            request.session.get(
+                "username",
+                "Admin"
+            )
+        )
     )
+
+    year = datetime.now(
+        ZoneInfo(TZ)
+    ).year
+
+    # ==========================================================
+    # HTML
+    # ==========================================================
 
     return HTMLResponse(f"""
 <!DOCTYPE html>
+
 <html lang="es">
+
 <head>
 
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>Panel Administrativo Puebla</title>
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+
+<title>
+    Secretaría de Movilidad y Transporte - Administración
+</title>
+
+<link
+    rel="icon"
+    href="https://smt.puebla.gob.mx/templates/puebla/favicon.ico"
+    type="image/vnd.microsoft.icon"
+>
 
 <style>
 
 :root {{
+
     --vino:#5f1b2d;
-    --vino2:#48101e;
+
+    --vino-oscuro:#48101e;
+
+    --dorado:#c09761;
+
+    --dorado-claro:#c79b66;
+
+    --gris:#949494;
+
+    --gris-claro:#f6f6f6;
+
     --azul:#001B4C;
-    --dorado:#c79b66;
-    --fondo:#f4f5f7;
+
+    --blanco:#ffffff;
 }}
 
 * {{
+    margin:0;
+    padding:0;
     box-sizing:border-box;
 }}
 
+html {{
+    min-height:100%;
+    background:#f4f4f4;
+}}
+
 body {{
-    margin:0;
-    background:var(--fondo);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
-    color:#495057;
-}}
 
-.layout {{
     min-height:100vh;
-    display:grid;
-    grid-template-columns:250px 1fr;
+
+    background:#f4f4f4;
+
+    color:#555;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 }}
 
-.sidebar {{
-    background:var(--vino);
-    color:white;
-    padding:24px 17px;
+img {{
+    max-width:100%;
+    height:auto;
 }}
 
-.brand {{
-    padding:0 10px 23px;
-    border-bottom:1px solid rgba(255,255,255,0.18);
-    margin-bottom:20px;
+
+/* =====================================================
+   HEADER
+===================================================== */
+
+.header {{
+
+    background:#fff;
+
+    position:relative;
+
+    z-index:10;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0,0,0,0.08);
 }}
 
-.brand h2 {{
-    margin:0;
-    font-size:1.25rem;
+.header-inner {{
+
+    max-width:1380px;
+
+    margin:auto;
+
+    padding:
+        18px 30px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:
+        space-between;
+
+    gap:30px;
 }}
 
-.brand p {{
-    margin:5px 0 0;
-    opacity:.72;
-    font-size:.8rem;
+.logos {{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:22px;
 }}
+
+.logo-gob {{
+
+    width:245px;
+
+    max-height:82px;
+
+    object-fit:contain;
+}}
+
+.logo-secretaria {{
+
+    width:225px;
+
+    max-height:88px;
+
+    object-fit:contain;
+}}
+
+.frase-header {{
+
+    width:300px;
+
+    max-height:90px;
+
+    object-fit:contain;
+}}
+
+
+/* =====================================================
+   MENU
+===================================================== */
 
 .menu {{
+
+    background:
+        var(--vino);
+}}
+
+.menu-inner {{
+
+    max-width:
+        1380px;
+
+    margin:auto;
+
+    min-height:
+        52px;
+
+    padding:
+        0 30px;
+
     display:flex;
-    flex-direction:column;
-    gap:6px;
+
+    align-items:center;
+
+    justify-content:
+        space-between;
+
+    gap:15px;
+}}
+
+.menu-links {{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:4px;
 }}
 
 .menu a {{
+
     color:white;
+
     text-decoration:none;
-    padding:12px 13px;
-    border-radius:8px;
-    font-size:.92rem;
+
+    font-size:14px;
+
+    padding:
+        17px 15px;
+
+    transition:
+        background .2s ease;
 }}
 
-.menu a:hover,
-.menu a.active {{
-    background:rgba(255,255,255,0.14);
+.menu a:hover {{
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .1
+        );
 }}
 
-.logout {{
-    margin-top:12px;
-    background:rgba(0,0,0,0.15);
+.menu .cerrar {{
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            .16
+        );
+
+    border-radius:
+        7px;
+
+    padding:
+        10px 15px;
 }}
 
-.main {{
-    min-width:0;
+
+/* =====================================================
+   HERO
+===================================================== */
+
+.hero {{
+
+    position:relative;
+
+    overflow:hidden;
+
+    background:
+
+        linear-gradient(
+            120deg,
+            #f8f8f8 0%,
+            #f4f4f4 65%,
+            #eee 100%
+        );
+
+    border-bottom:
+        1px solid
+        #e4e4e4;
+
+    padding:
+        50px 20px
+        90px;
+
+    text-align:center;
 }}
 
-.topbar {{
+.hero::after {{
+
+    content:"";
+
+    position:absolute;
+
+    bottom:0;
+
+    left:0;
+
+    width:100%;
+
+    height:7px;
+
+    background:
+        var(--dorado);
+}}
+
+.hero h1 {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        34px;
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        9px;
+}}
+
+.hero p {{
+
+    color:
+        var(--gris);
+
+    font-size:
+        17px;
+}}
+
+
+/* =====================================================
+   CONTENIDO
+===================================================== */
+
+.contenido {{
+
+    padding:
+        0 20px
+        60px;
+}}
+
+.panel-box {{
+
+    position:relative;
+
+    z-index:2;
+
+    width:100%;
+
+    max-width:1100px;
+
+    margin:
+        -55px auto
+        40px;
+
     background:white;
-    min-height:72px;
-    padding:0 28px;
+
+    border-radius:
+        24px;
+
+    padding:
+        38px 40px
+        42px;
+
+    box-shadow:
+        0 8px 32px
+        rgba(
+            0,
+            0,
+            0,
+            .11
+        );
+}}
+
+
+/* =====================================================
+   BIENVENIDA
+===================================================== */
+
+.bienvenida {{
+
     display:flex;
+
+    justify-content:
+        space-between;
+
     align-items:center;
-    justify-content:space-between;
-    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+
+    gap:20px;
+
+    margin-bottom:
+        30px;
 }}
 
-.topbar h1 {{
-    margin:0;
-    color:var(--azul);
-    font-size:1.35rem;
+.bienvenida h2 {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        25px;
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        5px;
 }}
 
-.user {{
-    color:#777;
-    font-size:.9rem;
+.bienvenida p {{
+
+    color:
+        var(--gris);
+
+    font-size:
+        14px;
 }}
 
-.content {{
-    padding:30px;
+.usuario {{
+
+    background:
+        #faf7f3;
+
+    border-left:
+        4px solid
+        var(--dorado);
+
+    padding:
+        12px 16px;
+
+    border-radius:
+        8px;
+
+    font-size:
+        14px;
 }}
+
+
+/* =====================================================
+   ESTADÍSTICAS
+===================================================== */
 
 .stats {{
+
     display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:20px;
-    margin-bottom:28px;
+
+    grid-template-columns:
+        repeat(
+            4,
+            1fr
+        );
+
+    gap:
+        15px;
+
+    margin-bottom:
+        32px;
 }}
 
 .stat {{
-    background:white;
-    border-radius:14px;
-    padding:24px;
-    box-shadow:0 3px 12px rgba(0,0,0,0.06);
+
+    background:
+        var(--gris-claro);
+
+    border-radius:
+        12px;
+
+    padding:
+        20px;
+
+    border-left:
+        4px solid
+        var(--dorado-claro);
 }}
 
 .stat-label {{
-    color:#888;
-    font-size:.77rem;
-    font-weight:700;
-    text-transform:uppercase;
-    margin-bottom:10px;
+
+    color:
+        var(--gris);
+
+    font-size:
+        11px;
+
+    font-weight:
+        bold;
+
+    text-transform:
+        uppercase;
+
+    letter-spacing:
+        .7px;
+
+    margin-bottom:
+        8px;
 }}
 
 .stat-value {{
-    color:var(--azul);
-    font-size:2rem;
-    font-weight:700;
+
+    color:
+        var(--vino);
+
+    font-size:
+        30px;
+
+    font-weight:
+        600;
 }}
 
 .stat-sub {{
-    margin-top:5px;
-    color:#999;
-    font-size:.8rem;
+
+    color:
+        #999;
+
+    font-size:
+        12px;
+
+    margin-top:
+        4px;
 }}
 
-.columns {{
+
+/* =====================================================
+   SECCIONES
+===================================================== */
+
+.separador {{
+
+    width:
+        100%;
+
+    height:
+        1px;
+
+    background:
+        #e9e9e9;
+
+    margin:
+        28px 0;
+}}
+
+.titulo-seccion {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        22px;
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        20px;
+}}
+
+
+/* =====================================================
+   ACCIONES
+===================================================== */
+
+.acciones {{
+
     display:grid;
-    grid-template-columns:1.3fr 1fr;
-    gap:20px;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        15px;
 }}
 
-.card {{
-    background:white;
-    border-radius:14px;
-    padding:25px;
-    box-shadow:0 3px 12px rgba(0,0,0,0.06);
-}}
+.accion {{
 
-.card h2 {{
-    margin:0 0 20px;
-    color:var(--azul);
-    font-size:1.1rem;
-}}
-
-.actions {{
-    display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:12px;
-}}
-
-.action {{
-    text-decoration:none;
-    color:#555;
-    border:1px solid #ececec;
-    border-radius:10px;
-    padding:17px;
-    transition:.2s;
-}}
-
-.action:hover {{
-    border-color:var(--dorado);
-    transform:translateY(-1px);
-}}
-
-.action strong {{
     display:block;
-    color:var(--azul);
-    margin-bottom:4px;
+
+    background:
+        var(--gris-claro);
+
+    border-radius:
+        12px;
+
+    padding:
+        20px;
+
+    border-left:
+        4px solid
+        var(--dorado-claro);
+
+    text-decoration:
+        none;
+
+    transition:
+        .2s ease;
 }}
 
-.action span {{
-    color:#888;
-    font-size:.8rem;
+.accion:hover {{
+
+    transform:
+        translateY(-2px);
+
+    box-shadow:
+        0 5px 15px
+        rgba(
+            0,
+            0,
+            0,
+            .07
+        );
 }}
 
-.status {{
-    padding:11px 0;
-    border-bottom:1px solid #eee;
+.accion strong {{
+
+    display:block;
+
+    color:
+        var(--vino);
+
+    font-size:
+        16px;
+
+    margin-bottom:
+        6px;
+}}
+
+.accion span {{
+
+    color:
+        #777;
+
+    font-size:
+        13px;
+}}
+
+
+/* =====================================================
+   SISTEMA
+===================================================== */
+
+.sistema-grid {{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        12px;
+}}
+
+.sistema-item {{
+
+    background:
+        #fafafa;
+
+    border-radius:
+        10px;
+
+    padding:
+        14px 16px;
+
     display:flex;
-    justify-content:space-between;
-    gap:20px;
-}}
 
-.status:last-child {{
-    border-bottom:0;
+    justify-content:
+        space-between;
+
+    gap:
+        15px;
+
+    border:
+        1px solid
+        #eeeeee;
+
+    font-size:
+        14px;
 }}
 
 .ok {{
-    color:#198754;
-    font-weight:650;
+
+    color:
+        #198754;
+
+    font-weight:
+        600;
 }}
 
+.error-status {{
+
+    color:
+        #b72f3c;
+
+    font-weight:
+        600;
+}}
+
+
+/* =====================================================
+   NOTA
+===================================================== */
+
+.nota {{
+
+    background:
+        #faf7f3;
+
+    border-left:
+        4px solid
+        var(--dorado);
+
+    margin-top:
+        25px;
+
+    padding:
+        16px 18px;
+
+    color:
+        #686868;
+
+    font-size:
+        13px;
+
+    line-height:
+        1.55;
+}}
+
+.nota strong {{
+
+    color:
+        var(--vino);
+}}
+
+
+/* =====================================================
+   FOOTER
+===================================================== */
+
+.footer {{
+
+    background:
+        var(--vino);
+
+    color:white;
+
+    padding:
+        45px 25px;
+}}
+
+.footer-inner {{
+
+    max-width:
+        1150px;
+
+    margin:auto;
+
+    text-align:center;
+}}
+
+.footer-logo {{
+
+    max-width:
+        480px;
+}}
+
+.copyright {{
+
+    padding:
+        15px 20px;
+
+    background:
+        var(--vino-oscuro);
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .72
+        );
+
+    text-align:center;
+
+    font-size:
+        12px;
+}}
+
+
+/* =====================================================
+   CELULAR
+===================================================== */
+
 @media(max-width:900px) {{
-    .layout {{
-        grid-template-columns:1fr;
+
+    .stats {{
+
+        grid-template-columns:
+            repeat(
+                2,
+                1fr
+            );
     }}
 
-    .sidebar {{
+}}
+
+@media(max-width:650px) {{
+
+    .header-inner {{
+
+        display:block;
+
+        padding:
+            15px;
+    }}
+
+    .logos {{
+
+        justify-content:
+            center;
+
+        gap:
+            10px;
+    }}
+
+    .logo-gob {{
+
+        width:
+            48%;
+    }}
+
+    .logo-secretaria {{
+
+        width:
+            44%;
+    }}
+
+    .frase-header {{
+
         display:none;
     }}
 
+    .menu-inner {{
+
+        padding:
+            0 10px;
+
+        display:block;
+    }}
+
+    .menu-links {{
+
+        overflow-x:auto;
+    }}
+
+    .menu a {{
+
+        white-space:
+            nowrap;
+
+        font-size:
+            12px;
+
+        padding:
+            15px 10px;
+    }}
+
+    .menu .cerrar {{
+
+        display:block;
+
+        text-align:center;
+
+        margin:
+            6px 0 10px;
+    }}
+
+    .hero {{
+
+        padding:
+            38px 15px
+            80px;
+    }}
+
+    .hero h1 {{
+
+        font-size:
+            26px;
+    }}
+
+    .contenido {{
+
+        padding:
+            0 12px
+            40px;
+    }}
+
+    .panel-box {{
+
+        margin:
+            -45px auto
+            30px;
+
+        padding:
+            24px 16px
+            28px;
+
+        border-radius:
+            17px;
+    }}
+
+    .bienvenida {{
+
+        display:block;
+    }}
+
+    .usuario {{
+
+        margin-top:
+            15px;
+    }}
+
     .stats {{
-        grid-template-columns:repeat(2,1fr);
+
+        grid-template-columns:
+            1fr 1fr;
     }}
 
-    .columns {{
-        grid-template-columns:1fr;
-    }}
-}}
+    .acciones {{
 
-@media(max-width:550px) {{
-    .content {{
-        padding:18px;
+        grid-template-columns:
+            1fr;
     }}
 
-    .stats {{
-        grid-template-columns:1fr;
+    .sistema-grid {{
+
+        grid-template-columns:
+            1fr;
     }}
 
-    .actions {{
-        grid-template-columns:1fr;
-    }}
 }}
 
 </style>
 
 </head>
 
+
 <body>
 
-<div class="layout">
 
-<aside class="sidebar">
+<!-- =====================================================
+     HEADER
+===================================================== -->
 
-    <div class="brand">
-        <h2>Panel Puebla</h2>
-        <p>Administración del sistema</p>
+<header class="header">
+
+<div class="header-inner">
+
+    <div class="logos">
+
+        <a
+            href="https://puebla.gob.mx/"
+            target="_blank"
+            rel="noopener"
+        >
+
+            <img
+                class="logo-gob"
+                src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+                alt="Gobierno del Estado de Puebla"
+            >
+
+        </a>
+
+
+        <img
+            class="logo-secretaria"
+            src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
+            alt="Secretaría de Movilidad y Transporte"
+        >
+
     </div>
 
-    <nav class="menu">
 
-        <a href="/admin" class="active">
-            📊 Dashboard
-        </a>
+    <img
+        class="frase-header"
+        src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
+        alt="Puebla"
+    >
 
-        <a href="/admin/folios">
-            📄 Folios
-        </a>
-
-        <a href="/admin/crear">
-           ➕ Crear permiso
-        </a>
-
-        <a href="/admin/usuarios">
-            👥 Usuarios terceros
-        </a>
-
-        <a href="/admin/tablas">
-            🗄️ Tablas
-        </a>
-
-        <a href="/admin/auditoria">
-            🧾 Auditoría
-        </a>
-
-        <a href="/logout" class="logout">
-            🚪 Salir
-        </a>
-
-    </nav>
-
-</aside>
-
-
-<section class="main">
-
-<header class="topbar">
-
-    <h1>Dashboard</h1>
-
-    <div class="user">
-        👤 {username}
-    </div>
+</div>
 
 </header>
 
 
-<main class="content">
+<!-- =====================================================
+     MENÚ ADMIN
+===================================================== -->
 
-<div class="stats">
+<nav class="menu">
 
-    <div class="stat">
-        <div class="stat-label">Folios registrados</div>
-        <div class="stat-value">{total}</div>
-        <div class="stat-sub">Puebla</div>
+<div class="menu-inner">
+
+    <div class="menu-links">
+
+        <a href="/admin">
+            Inicio
+        </a>
+
+        <a href="/admin/crear">
+            Crear permiso
+        </a>
+
+        <a href="/admin/folios">
+            Gestionar folios
+        </a>
+
+        <a href="/admin/usuarios">
+            Usuarios
+        </a>
+
+        <a href="/admin/tablas">
+            Tablas
+        </a>
+
+        <a href="/admin/auditoria">
+            Auditoría
+        </a>
+
     </div>
 
-    <div class="stat">
-        <div class="stat-label">Vigentes</div>
-        <div class="stat-value">{vigentes}</div>
-        <div class="stat-sub">Dentro de vigencia</div>
-    </div>
 
-    <div class="stat">
-        <div class="stat-label">Vencidos</div>
-        <div class="stat-value">{vencidos}</div>
-        <div class="stat-sub">Fuera de vigencia</div>
-    </div>
-
-    <div class="stat">
-        <div class="stat-label">Timers activos</div>
-        <div class="stat-value">{timers}</div>
-        <div class="stat-sub">Pendientes de pago</div>
-    </div>
+    <a
+        href="/logout"
+        class="cerrar"
+    >
+        Cerrar sesión
+    </a>
 
 </div>
 
+</nav>
 
-<div class="columns">
 
-<section class="card">
+<!-- =====================================================
+     HERO
+===================================================== -->
 
-    <h2>Accesos rápidos</h2>
+<section class="hero">
 
-    <div class="actions">
+    <h1>
+        Panel Administrativo
+    </h1>
 
-        <a class="action" href="/admin/crear">
-            <strong>➕ Crear permiso</strong>
-            <span>Generar un folio manualmente</span>
-        </a>
-
-        <a class="action" href="/admin/folios">
-            <strong>📄 Administrar folios</strong>
-            <span>Consultar, editar y eliminar</span>
-        </a>
-
-        <a class="action" href="/admin/usuarios">
-            <strong>👥 Usuarios terceros</strong>
-            <span>Cuentas y paquetes de folios</span>
-        </a>
-
-        <a class="action" href="/admin/tablas">
-            <strong>🗄️ Tablas Supabase</strong>
-            <span>Consultar datos del sistema</span>
-        </a>
-
-    </div>
+    <p>
+        Sistema de administración de permisos vehiculares
+    </p>
 
 </section>
 
 
-<section class="card">
+<!-- =====================================================
+     DASHBOARD
+===================================================== -->
 
-    <h2>Estado del sistema</h2>
+<main class="contenido">
 
-    <div class="status">
-        <span>Supabase</span>
-        <span class="ok">● Conectado</span>
+
+<section class="panel-box">
+
+
+    <div class="bienvenida">
+
+        <div>
+
+            <h2>
+                Administración del sistema
+            </h2>
+
+            <p>
+                Consulta y administra los registros disponibles.
+            </p>
+
+        </div>
+
+
+        <div class="usuario">
+
+            <strong>
+                Usuario:
+            </strong>
+
+            {username}
+
+        </div>
+
     </div>
 
-    <div class="status">
-        <span>Telegram bot</span>
-        <span class="ok">● Configurado</span>
+
+    <div class="stats">
+
+
+        <div class="stat">
+
+            <div class="stat-label">
+                Folios registrados
+            </div>
+
+            <div class="stat-value">
+                {total}
+            </div>
+
+            <div class="stat-sub">
+                Puebla
+            </div>
+
+        </div>
+
+
+        <div class="stat">
+
+            <div class="stat-label">
+                Vigentes
+            </div>
+
+            <div class="stat-value">
+                {vigentes}
+            </div>
+
+            <div class="stat-sub">
+                Dentro de vigencia
+            </div>
+
+        </div>
+
+
+        <div class="stat">
+
+            <div class="stat-label">
+                Vencidos
+            </div>
+
+            <div class="stat-value">
+                {vencidos}
+            </div>
+
+            <div class="stat-sub">
+                Fuera de vigencia
+            </div>
+
+        </div>
+
+
+        <div class="stat">
+
+            <div class="stat-label">
+                Timers activos
+            </div>
+
+            <div class="stat-value">
+                {timers}
+            </div>
+
+            <div class="stat-sub">
+                Pendientes
+            </div>
+
+        </div>
+
+
     </div>
 
-    <div class="status">
-        <span>Entidad</span>
-        <span>{ENTIDAD.upper()}</span>
+
+    <div class="separador"></div>
+
+
+    <h2 class="titulo-seccion">
+        Accesos rápidos
+    </h2>
+
+
+    <div class="acciones">
+
+
+        <a
+            class="accion"
+            href="/admin/crear"
+        >
+
+            <strong>
+                ＋ Crear permiso
+            </strong>
+
+            <span>
+                Generar un nuevo permiso manualmente
+            </span>
+
+        </a>
+
+
+        <a
+            class="accion"
+            href="/admin/folios"
+        >
+
+            <strong>
+                Administrar folios
+            </strong>
+
+            <span>
+                Consultar y eliminar registros
+            </span>
+
+        </a>
+
+
+        <a
+            class="accion"
+            href="/admin/usuarios"
+        >
+
+            <strong>
+                Usuarios terceros
+            </strong>
+
+            <span>
+                Administrar cuentas y paquetes
+            </span>
+
+        </a>
+
+
+        <a
+            class="accion"
+            href="/admin/tablas"
+        >
+
+            <strong>
+                Tablas del sistema
+            </strong>
+
+            <span>
+                Consultar información almacenada
+            </span>
+
+        </a>
+
+
     </div>
 
-    <div class="status">
-        <span>Precio</span>
-        <span>${PRECIO} MXN</span>
+
+    <div class="separador"></div>
+
+
+    <h2 class="titulo-seccion">
+        Estado del sistema
+    </h2>
+
+
+    <div class="sistema-grid">
+
+
+        <div class="sistema-item">
+
+            <span>
+                Supabase
+            </span>
+
+            <span class="{supabase_clase}">
+                ● {supabase_estado}
+            </span>
+
+        </div>
+
+
+        <div class="sistema-item">
+
+            <span>
+                Telegram Bot
+            </span>
+
+            <span class="ok">
+                ● Configurado
+            </span>
+
+        </div>
+
+
+        <div class="sistema-item">
+
+            <span>
+                Entidad
+            </span>
+
+            <strong>
+                {ENTIDAD.upper()}
+            </strong>
+
+        </div>
+
+
+        <div class="sistema-item">
+
+            <span>
+                Precio
+            </span>
+
+            <strong>
+                ${PRECIO} MXN
+            </strong>
+
+        </div>
+
+
+        <div class="sistema-item">
+
+            <span>
+                Siguiente folio
+            </span>
+
+            <strong>
+                {siguiente}
+            </strong>
+
+        </div>
+
+
+        <div class="sistema-item">
+
+            <span>
+                Sesión
+            </span>
+
+            <strong>
+                30 minutos
+            </strong>
+
+        </div>
+
+
     </div>
 
-    <div class="status">
-        <span>Siguiente folio</span>
-        <span>{siguiente}</span>
+
+    <div class="nota">
+
+        <strong>
+            Sesión administrativa:
+        </strong>
+
+        por seguridad el acceso caduca después de
+        aproximadamente 30 minutos.
+
     </div>
+
 
 </section>
 
-</div>
 
 </main>
 
-</section>
+
+<!-- =====================================================
+     FOOTER
+===================================================== -->
+
+<footer class="footer">
+
+<div class="footer-inner">
+
+    <img
+        class="footer-logo"
+        src="https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg"
+        alt="Gobierno del Estado de Puebla"
+    >
 
 </div>
 
+</footer>
+
+
+<div class="copyright">
+
+    © {year} Gobierno del Estado de Puebla
+
+</div>
+
+
 </body>
+
 </html>
 """)
 
