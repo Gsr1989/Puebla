@@ -5876,19 +5876,16 @@ async def cliente_logout(
 # PANEL INICIAL DE CLIENTE
 # ============================================================
 
-@app.get("/cliente", response_class=HTMLResponse)
-async def cliente_panel(request: Request):
+# ============================================================
+# PORTAL DE CLIENTES
+# ============================================================
 
-    cliente_id = request.session.get(
-        "cliente_id"
-    )
+def obtener_cliente_sesion(request: Request):
+
+    cliente_id = request.session.get("cliente_id")
 
     if not cliente_id:
-
-        return RedirectResponse(
-            "/cliente/login",
-            status_code=302
-        )
+        return None
 
     try:
 
@@ -5899,77 +5896,204 @@ async def cliente_panel(request: Request):
                 "id,usuario,nombre,activo,"
                 "permisos_asignados,permisos_usados"
             )
-            .eq(
-                "id",
-                cliente_id
-            )
+            .eq("id", cliente_id)
             .limit(1)
             .execute()
         )
 
         if not resp.data:
-
-            request.session.clear()
-
-            return RedirectResponse(
-                "/cliente/login",
-                status_code=302
-            )
+            return None
 
         cliente = resp.data[0]
 
-        if not cliente.get(
-            "activo",
-            False
-        ):
+        if not cliente.get("activo", False):
+            return None
 
-            request.session.clear()
+        return cliente
 
-            return RedirectResponse(
-                "/cliente/login",
-                status_code=302
-            )
+    except Exception as e:
 
-        asignados = int(
-            cliente.get(
-                "permisos_asignados",
-                0
-            )
-            or 0
+        print(
+            "[CLIENTE SESION]",
+            e
         )
 
-        usados = int(
-            cliente.get(
-                "permisos_usados",
-                0
-            )
-            or 0
-        )
+        return None
 
-        restantes = max(
-            0,
-            asignados - usados
-        )
 
-        nombre = html_lib.escape(
-            str(
-                cliente.get("nombre")
-                or cliente.get("usuario")
-                or ""
-            )
-        )
+async def consumir_creditos_cliente(
+    cliente_id: int,
+    cantidad: int
+) -> bool:
 
-        usuario = html_lib.escape(
-            str(
-                cliente.get(
-                    "usuario",
-                    ""
+    consumidos = 0
+
+    try:
+
+        for _ in range(cantidad):
+
+            resp = (
+                supabase_admin
+                .rpc(
+                    "consumir_permiso_cliente",
+                    {
+                        "p_cliente_id":
+                            cliente_id
+                    }
                 )
+                .execute()
             )
+
+            ok = bool(resp.data)
+
+            if not ok:
+
+                # Devolver lo que alcanzamos
+                # a consumir.
+                for _ in range(consumidos):
+
+                    supabase_admin.rpc(
+                        "devolver_permiso_cliente",
+                        {
+                            "p_cliente_id":
+                                cliente_id
+                        }
+                    ).execute()
+
+                return False
+
+            consumidos += 1
+
+        return True
+
+    except Exception as e:
+
+        print(
+            "[CONSUMIR CREDITOS]",
+            e
         )
 
-        return HTMLResponse(f"""
+        # rollback
+        for _ in range(consumidos):
+
+            try:
+
+                supabase_admin.rpc(
+                    "devolver_permiso_cliente",
+                    {
+                        "p_cliente_id":
+                            cliente_id
+                    }
+                ).execute()
+
+            except Exception:
+                pass
+
+        return False
+
+
+def devolver_creditos_cliente(
+    cliente_id: int,
+    cantidad: int
+):
+
+    for _ in range(cantidad):
+
+        try:
+
+            supabase_admin.rpc(
+                "devolver_permiso_cliente",
+                {
+                    "p_cliente_id":
+                        cliente_id
+                }
+            ).execute()
+
+        except Exception as e:
+
+            print(
+                "[DEVOLVER CREDITO]",
+                e
+            )
+
+
+# ============================================================
+# PANEL CLIENTE
+# ============================================================
+
+@app.get("/cliente", response_class=HTMLResponse)
+async def cliente_panel(request: Request):
+
+    cliente = obtener_cliente_sesion(
+        request
+    )
+
+    if not cliente:
+
+        request.session.clear()
+
+        return RedirectResponse(
+            "/cliente/login",
+            status_code=302
+        )
+
+    asignados = int(
+        cliente.get(
+            "permisos_asignados",
+            0
+        )
+        or 0
+    )
+
+    usados = int(
+        cliente.get(
+            "permisos_usados",
+            0
+        )
+        or 0
+    )
+
+    restantes = max(
+        0,
+        asignados - usados
+    )
+
+    porcentaje = (
+        round(
+            usados
+            / asignados
+            * 100,
+            1
+        )
+        if asignados > 0
+        else 0
+    )
+
+    porcentaje_visual = min(
+        porcentaje,
+        100
+    )
+
+    nombre = html_lib.escape(
+        str(
+            cliente.get("nombre")
+            or cliente.get("usuario")
+            or ""
+        )
+    )
+
+    usuario = html_lib.escape(
+        str(
+            cliente.get(
+                "usuario",
+                ""
+            )
+        )
+    )
+
+    return HTMLResponse(f"""
 <!DOCTYPE html>
+
 <html lang="es">
 
 <head>
@@ -5981,81 +6105,290 @@ async def cliente_panel(request: Request):
     content="width=device-width,initial-scale=1"
 >
 
-<title>Panel de cliente</title>
+<title>
+    Portal de clientes
+</title>
 
 <style>
 
-body {{
+:root {{
+    --vino:#5f1b2d;
+    --vino-oscuro:#48101e;
+    --dorado:#c09761;
+    --gris:#949494;
+    --gris-claro:#f6f6f6;
+}}
+
+* {{
+    box-sizing:border-box;
     margin:0;
+    padding:0;
+}}
+
+body {{
     background:#f4f4f4;
-    font-family:Arial,sans-serif;
     color:#555;
+    font-family:Arial,Helvetica,sans-serif;
 }}
 
 .header {{
-    background:#5f1b2d;
+    background:white;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+}}
+
+.header-inner {{
+    max-width:1380px;
+    margin:auto;
+    padding:18px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:30px;
+}}
+
+.logos {{
+    display:flex;
+    align-items:center;
+    gap:22px;
+}}
+
+.logo-gob {{
+    width:245px;
+}}
+
+.logo-secretaria {{
+    width:225px;
+}}
+
+.frase {{
+    width:300px;
+}}
+
+.menu {{
+    background:var(--vino);
+}}
+
+.menu-inner {{
+    max-width:1380px;
+    margin:auto;
+    padding:0 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}}
+
+.menu-links {{
+    display:flex;
+}}
+
+.menu a {{
     color:white;
-    padding:18px 22px;
+    text-decoration:none;
+    padding:17px 15px;
+    font-size:14px;
+}}
+
+.menu a:hover,
+.menu a.active {{
+    background:rgba(255,255,255,.12);
+}}
+
+.cerrar {{
+    background:rgba(0,0,0,.15);
+}}
+
+.hero {{
+    position:relative;
+    text-align:center;
+    padding:50px 20px 90px;
+    background:linear-gradient(
+        120deg,
+        #f8f8f8,
+        #eeeeee
+    );
+}}
+
+.hero::after {{
+    content:"";
+    position:absolute;
+    bottom:0;
+    left:0;
+    width:100%;
+    height:7px;
+    background:var(--dorado);
+}}
+
+.hero h1 {{
+    color:var(--vino);
+    font-size:34px;
+    font-weight:400;
+}}
+
+.hero p {{
+    color:var(--gris);
+    margin-top:8px;
 }}
 
 .contenido {{
-    max-width:900px;
-    margin:40px auto;
-    padding:0 18px;
+    padding:0 20px 60px;
 }}
 
-.card {{
+.panel {{
+    max-width:1100px;
+    margin:-55px auto 40px;
+    position:relative;
+    z-index:2;
     background:white;
-    border-radius:18px;
-    padding:30px;
-    box-shadow:0 6px 25px rgba(0,0,0,.1);
+    border-radius:24px;
+    padding:38px 40px;
+    box-shadow:0 8px 32px rgba(0,0,0,.11);
 }}
 
-h1 {{
-    color:#5f1b2d;
-    margin-top:0;
+.bienvenida h2 {{
+    color:var(--vino);
+    font-weight:400;
+    font-size:26px;
+}}
+
+.bienvenida p {{
+    color:#888;
+    margin-top:5px;
 }}
 
 .stats {{
     display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:14px;
-    margin-top:25px;
+    grid-template-columns:repeat(4,1fr);
+    gap:15px;
+    margin-top:30px;
 }}
 
 .stat {{
-    background:#f6f6f6;
-    padding:20px;
+    background:var(--gris-claro);
     border-radius:12px;
-    border-left:4px solid #c09761;
+    padding:20px;
+    border-left:4px solid var(--dorado);
 }}
 
 .stat span {{
     display:block;
     color:#888;
-    font-size:12px;
     text-transform:uppercase;
+    font-size:11px;
 }}
 
 .stat strong {{
     display:block;
-    color:#5f1b2d;
-    font-size:28px;
     margin-top:7px;
+    color:var(--vino);
+    font-size:29px;
 }}
 
-.salir {{
-    display:inline-block;
+.barra {{
+    width:100%;
+    height:15px;
+    background:#eee;
+    border-radius:30px;
+    overflow:hidden;
     margin-top:25px;
-    color:#5f1b2d;
 }}
 
-@media(max-width:600px) {{
+.progreso {{
+    height:100%;
+    width:{porcentaje_visual}%;
+    background:linear-gradient(
+        90deg,
+        var(--dorado),
+        var(--vino)
+    );
+}}
 
-    .stats {{
-        grid-template-columns:1fr;
+.acciones {{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+    margin-top:30px;
+}}
+
+.accion {{
+    text-decoration:none;
+    background:var(--gris-claro);
+    border-left:4px solid var(--dorado);
+    padding:22px;
+    border-radius:12px;
+}}
+
+.accion strong {{
+    color:var(--vino);
+    display:block;
+    margin-bottom:5px;
+}}
+
+.accion span {{
+    color:#777;
+    font-size:13px;
+}}
+
+.footer {{
+    background:var(--vino);
+    padding:45px 25px;
+    text-align:center;
+}}
+
+.footer img {{
+    max-width:480px;
+}}
+
+@media(max-width:700px) {{
+
+    .header-inner {{
+        display:block;
+        padding:15px;
     }}
 
+    .logos {{
+        justify-content:center;
+        gap:8px;
+    }}
+
+    .logo-gob {{
+        width:50%;
+    }}
+
+    .logo-secretaria {{
+        width:43%;
+    }}
+
+    .frase {{
+        display:none;
+    }}
+
+    .menu-inner {{
+        padding:0 10px;
+        display:block;
+    }}
+
+    .menu-links {{
+        overflow-x:auto;
+    }}
+
+    .menu a {{
+        white-space:nowrap;
+        font-size:12px;
+        padding:15px 10px;
+    }}
+
+    .panel {{
+        padding:24px 16px;
+        border-radius:17px;
+    }}
+
+    .stats {{
+        grid-template-columns:1fr 1fr;
+    }}
+
+    .acciones {{
+        grid-template-columns:1fr;
+    }}
 }}
 
 </style>
@@ -6064,33 +6397,106 @@ h1 {{
 
 <body>
 
+
 <header class="header">
 
-<strong>
-    Sistema de Clientes
-</strong>
+<div class="header-inner">
+
+<div class="logos">
+
+<img
+    class="logo-gob"
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+>
+
+<img
+    class="logo-secretaria"
+    src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
+>
+
+</div>
+
+<img
+    class="frase"
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
+>
+
+</div>
 
 </header>
 
 
-<main class="contenido">
+<nav class="menu">
 
-<section class="card">
+<div class="menu-inner">
+
+<div class="menu-links">
+
+<a
+    href="/cliente"
+    class="active"
+>
+    Inicio
+</a>
+
+<a href="/cliente/crear">
+    Crear permiso
+</a>
+
+<a href="/cliente/mis-permisos">
+    Mis permisos
+</a>
+
+</div>
+
+<a
+    href="/cliente/logout"
+    class="cerrar"
+>
+    Cerrar sesión
+</a>
+
+</div>
+
+</nav>
+
+
+<section class="hero">
 
 <h1>
-    Bienvenido, {nombre}
+    Portal de Clientes
 </h1>
 
 <p>
-    Usuario: <strong>{usuario}</strong>
+    Administración de permisos asignados
 </p>
+
+</section>
+
+
+<main class="contenido">
+
+<section class="panel">
+
+<div class="bienvenida">
+
+<h2>
+    Bienvenido, {nombre}
+</h2>
+
+<p>
+    Usuario: {usuario}
+</p>
+
+</div>
+
 
 <div class="stats">
 
 <div class="stat">
 
 <span>
-    Permisos asignados
+    Asignados
 </span>
 
 <strong>
@@ -6125,35 +6531,2038 @@ h1 {{
 
 </div>
 
+
+<div class="stat">
+
+<span>
+    Consumo
+</span>
+
+<strong>
+    {porcentaje}%
+</strong>
+
+</div>
+
 </div>
 
 
+<div class="barra">
+
+<div class="progreso"></div>
+
+</div>
+
+
+<div class="acciones">
+
 <a
-    class="salir"
-    href="/cliente/logout"
+    class="accion"
+    href="/cliente/crear"
 >
-    Cerrar sesión
+
+<strong>
+    ＋ Crear permiso
+</strong>
+
+<span>
+    Generar un nuevo permiso
+</span>
+
 </a>
+
+
+<a
+    class="accion"
+    href="/cliente/mis-permisos"
+>
+
+<strong>
+    Mis permisos
+</strong>
+
+<span>
+    Consultar documentos generados
+</span>
+
+</a>
+
+</div>
 
 </section>
 
 </main>
 
+
+<footer class="footer">
+
+<img
+    src="https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg"
+>
+
+</footer>
+
+
 </body>
 </html>
 """)
 
+
+# ============================================================
+# FORMULARIO CLIENTE
+# ============================================================
+
+@app.get("/cliente/crear", response_class=HTMLResponse)
+async def cliente_crear_get(request: Request):
+
+    cliente = obtener_cliente_sesion(
+        request
+    )
+
+    if not cliente:
+
+        return RedirectResponse(
+            "/cliente/login",
+            status_code=302
+        )
+
+    asignados = int(
+        cliente.get(
+            "permisos_asignados",
+            0
+        )
+        or 0
+    )
+
+    usados = int(
+        cliente.get(
+            "permisos_usados",
+            0
+        )
+        or 0
+    )
+
+    restantes = max(
+        0,
+        asignados - usados
+    )
+
+    return HTMLResponse(f"""
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+    Crear permiso
+</title>
+
+<style>
+
+:root {{
+    --vino:#5f1b2d;
+    --vino-oscuro:#48101e;
+    --dorado:#c09761;
+    --gris:#949494;
+    --gris-claro:#f6f6f6;
+}}
+
+* {{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}}
+
+body {{
+    background:#f4f4f4;
+    color:#555;
+    font-family:Arial,Helvetica,sans-serif;
+}}
+
+.header {{
+    background:white;
+}}
+
+.header-inner {{
+    max-width:1380px;
+    margin:auto;
+    padding:18px 30px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}}
+
+.logos {{
+    display:flex;
+    gap:22px;
+    align-items:center;
+}}
+
+.logo-gob {{
+    width:245px;
+}}
+
+.logo-secretaria {{
+    width:225px;
+}}
+
+.frase {{
+    width:300px;
+}}
+
+.menu {{
+    background:var(--vino);
+}}
+
+.menu-inner {{
+    max-width:1380px;
+    margin:auto;
+    padding:0 30px;
+    display:flex;
+    justify-content:space-between;
+}}
+
+.menu-links {{
+    display:flex;
+}}
+
+.menu a {{
+    display:block;
+    padding:17px 15px;
+    color:white;
+    text-decoration:none;
+    font-size:14px;
+}}
+
+.menu a.active {{
+    background:rgba(255,255,255,.12);
+}}
+
+.hero {{
+    position:relative;
+    text-align:center;
+    padding:50px 20px 90px;
+    background:linear-gradient(
+        120deg,
+        #f8f8f8,
+        #eee
+    );
+}}
+
+.hero::after {{
+    content:"";
+    position:absolute;
+    left:0;
+    bottom:0;
+    height:7px;
+    width:100%;
+    background:var(--dorado);
+}}
+
+.hero h1 {{
+    color:var(--vino);
+    font-weight:400;
+    font-size:34px;
+}}
+
+.contenido {{
+    padding:0 20px 60px;
+}}
+
+.form-box {{
+    max-width:1000px;
+    margin:-55px auto 40px;
+    position:relative;
+    z-index:2;
+    background:white;
+    border-radius:24px;
+    padding:38px 40px;
+    box-shadow:0 8px 32px rgba(0,0,0,.11);
+}}
+
+.saldo {{
+    background:#faf7f3;
+    border-left:4px solid var(--dorado);
+    padding:17px;
+    border-radius:10px;
+    margin-bottom:25px;
+}}
+
+.seccion {{
+    margin-bottom:28px;
+}}
+
+.seccion h3 {{
+    color:var(--vino);
+    font-weight:400;
+    border-bottom:1px solid #e8e8e8;
+    padding-bottom:10px;
+    margin-bottom:17px;
+}}
+
+.grid {{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+}}
+
+.campo {{
+    margin-bottom:16px;
+}}
+
+label {{
+    display:block;
+    color:#666;
+    font-size:12px;
+    font-weight:bold;
+    text-transform:uppercase;
+    margin-bottom:7px;
+}}
+
+input,
+select {{
+    width:100%;
+    padding:13px 14px;
+    border:1px solid #d7d7d7;
+    border-radius:9px;
+    font-size:16px;
+}}
+
+button {{
+    border:0;
+    background:var(--dorado);
+    color:white;
+    padding:14px 25px;
+    border-radius:9px;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+}}
+
+.mensaje {{
+    display:none;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:20px;
+}}
+
+.error {{
+    background:#f8d7da;
+    color:#721c24;
+}}
+
+.ok {{
+    background:#e6f4e8;
+    color:#155724;
+}}
+
+.footer {{
+    background:var(--vino);
+    text-align:center;
+    padding:45px 20px;
+}}
+
+.footer img {{
+    max-width:480px;
+}}
+
+@media(max-width:700px) {{
+
+    .header-inner {{
+        display:block;
+        padding:15px;
+    }}
+
+    .logos {{
+        justify-content:center;
+        gap:8px;
+    }}
+
+    .logo-gob {{
+        width:50%;
+    }}
+
+    .logo-secretaria {{
+        width:43%;
+    }}
+
+    .frase {{
+        display:none;
+    }}
+
+    .menu-inner {{
+        display:block;
+        padding:0 10px;
+    }}
+
+    .menu-links {{
+        overflow-x:auto;
+    }}
+
+    .menu a {{
+        white-space:nowrap;
+        font-size:12px;
+    }}
+
+    .form-box {{
+        padding:24px 16px;
+        border-radius:17px;
+    }}
+
+    .grid {{
+        grid-template-columns:1fr;
+        gap:0;
+    }}
+}}
+
+</style>
+
+</head>
+
+<body>
+
+
+<header class="header">
+
+<div class="header-inner">
+
+<div class="logos">
+
+<img
+    class="logo-gob"
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+>
+
+<img
+    class="logo-secretaria"
+    src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
+>
+
+</div>
+
+<img
+    class="frase"
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
+>
+
+</div>
+
+</header>
+
+
+<nav class="menu">
+
+<div class="menu-inner">
+
+<div class="menu-links">
+
+<a href="/cliente">
+    Inicio
+</a>
+
+<a
+    href="/cliente/crear"
+    class="active"
+>
+    Crear permiso
+</a>
+
+<a href="/cliente/mis-permisos">
+    Mis permisos
+</a>
+
+</div>
+
+<a href="/cliente/logout">
+    Cerrar sesión
+</a>
+
+</div>
+
+</nav>
+
+
+<section class="hero">
+
+<h1>
+    Crear Permiso
+</h1>
+
+</section>
+
+
+<main class="contenido">
+
+<section class="form-box">
+
+
+<div class="saldo">
+
+<strong>
+    Permisos disponibles:
+</strong>
+
+{restantes}
+
+<br>
+
+<small>
+    15 y 30 días consumen 1 permiso.
+    El paquete 2×15 consume 2 permisos.
+</small>
+
+</div>
+
+
+<div
+    id="mensaje"
+    class="mensaje"
+></div>
+
+
+<form id="permisoForm">
+
+
+<section class="seccion">
+
+<h3>
+    Información del vehículo
+</h3>
+
+
+<div class="grid">
+
+<div class="campo">
+
+<label>
+    Marca
+</label>
+
+<input
+    name="marca"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Línea / Modelo
+</label>
+
+<input
+    name="linea"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Año
+</label>
+
+<input
+    name="anio"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Color
+</label>
+
+<input
+    name="color"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Número de serie / VIN
+</label>
+
+<input
+    name="serie"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Número de motor
+</label>
+
+<input
+    name="motor"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Combustible
+</label>
+
+<input
+    name="combustible"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Cilindros / CC
+</label>
+
+<input
+    name="cilindros"
+    required
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Tipo de vehículo
+</label>
+
+<select
+    name="tipo_auto"
+    required
+>
+
+<option value="">
+    Seleccionar...
+</option>
+
+<option>
+    Automóvil
+</option>
+
+<option>
+    Motocicleta
+</option>
+
+<option>
+    Suv
+</option>
+
+<option>
+    Van
+</option>
+
+<option>
+    Vagoneta
+</option>
+
+</select>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Presidencia
+</label>
+
+<input
+    name="presidencia"
+    required
+>
+
+</div>
+
+</div>
+
+</section>
+
+
+<section class="seccion">
+
+<h3>
+    Datos del titular
+</h3>
+
+<div class="campo">
+
+<label>
+    Nombre completo
+</label>
+
+<input
+    name="nombre"
+    required
+>
+
+</div>
+
+</section>
+
+
+<section class="seccion">
+
+<h3>
+    Vigencia
+</h3>
+
+
+<div class="grid">
+
+<div class="campo">
+
+<label>
+    Modalidad
+</label>
+
+<select
+    name="vigencia"
+    required
+>
+
+<option value="">
+    Seleccionar...
+</option>
+
+<option value="1">
+    15 días
+</option>
+
+<option value="2">
+    30 días
+</option>
+
+<option value="3">
+    2 × 15 días — 2x1
+</option>
+
+</select>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Fecha de expedición
+</label>
+
+<input
+    type="date"
+    id="fecha_exp"
+    name="fecha_exp"
+    required
+>
+
+</div>
+
+</div>
+
+</section>
+
+
+<button type="submit">
+    ✓ Crear permiso
+</button>
+
+
+</form>
+
+</section>
+
+</main>
+
+
+<footer class="footer">
+
+<img
+    src="https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg"
+>
+
+</footer>
+
+
+<script>
+
+document
+.getElementById(
+    "fecha_exp"
+)
+.valueAsDate =
+    new Date();
+
+
+document
+.getElementById(
+    "permisoForm"
+)
+.addEventListener(
+    "submit",
+    async function(e) {{
+
+        e.preventDefault();
+
+        const caja =
+            document.getElementById(
+                "mensaje"
+            );
+
+        caja.style.display =
+            "none";
+
+        const datos =
+            Object.fromEntries(
+                new FormData(this)
+            );
+
+        try {{
+
+            const res =
+                await fetch(
+                    "/cliente/crear",
+                    {{
+                        method:"POST",
+
+                        headers:{{
+                            "Content-Type":
+                                "application/json"
+                        }},
+
+                        body:
+                            JSON.stringify(
+                                datos
+                            )
+                    }}
+                );
+
+            const result =
+                await res.json();
+
+            if(result.ok) {{
+
+                caja.className =
+                    "mensaje ok";
+
+                caja.style.display =
+                    "block";
+
+                let texto =
+                    "Permiso creado correctamente.";
+
+                if(
+                    result.tipo
+                    ===
+                    "2x1"
+                ) {{
+
+                    texto +=
+                        " Folios: "
+                        + result.folio_1
+                        + " y "
+                        + result.folio_2;
+
+                }} else {{
+
+                    texto +=
+                        " Folio: "
+                        + result.folio;
+                }}
+
+                caja.innerHTML =
+                    texto
+                    +
+                    '<br><br>'
+                    +
+                    '<a href="'
+                    + result.pdf_url
+                    + '" target="_blank">'
+                    + 'Descargar PDF'
+                    + '</a>'
+                    +
+                    '<br><br>'
+                    +
+                    '<a href="/cliente/mis-permisos">'
+                    + 'Ver mis permisos'
+                    + '</a>';
+
+                this.reset();
+
+                document
+                .getElementById(
+                    "fecha_exp"
+                )
+                .valueAsDate =
+                    new Date();
+
+            }} else {{
+
+                caja.className =
+                    "mensaje error";
+
+                caja.style.display =
+                    "block";
+
+                caja.textContent =
+                    result.error
+                    ||
+                    "No fue posible crear el permiso";
+            }}
+
+        }} catch(err) {{
+
+            caja.className =
+                "mensaje error";
+
+            caja.style.display =
+                "block";
+
+            caja.textContent =
+                err.message;
+        }}
+
+    }}
+);
+
+</script>
+
+
+</body>
+</html>
+""")
+
+
+# ============================================================
+# CREAR PERMISO CLIENTE
+# ============================================================
+
+@app.post("/cliente/crear")
+async def cliente_crear_post(
+    request: Request
+):
+
+    cliente = obtener_cliente_sesion(
+        request
+    )
+
+    if not cliente:
+
+        return JSONResponse(
+            {
+                "ok": False,
+                "error":
+                    "Sesión no válida"
+            },
+            status_code=401
+        )
+
+    cliente_id = int(
+        cliente["id"]
+    )
+
+    folios_creados = []
+
+    creditos_consumidos = 0
+
+    try:
+
+        datos = await request.json()
+
+        vigencia = str(
+            datos.get(
+                "vigencia",
+                ""
+            )
+        ).strip()
+
+        if vigencia not in (
+            "1",
+            "2",
+            "3"
+        ):
+
+            raise ValueError(
+                "Vigencia inválida"
+            )
+
+        creditos_necesarios = (
+            2
+            if vigencia == "3"
+            else 1
+        )
+
+        fecha_exp = datetime.strptime(
+            datos["fecha_exp"],
+            "%Y-%m-%d"
+        ).date()
+
+        datos_comunes = {
+
+            "marca":
+                datos["marca"]
+                .upper()
+                .strip(),
+
+            "linea":
+                datos["linea"]
+                .upper()
+                .strip(),
+
+            "anio":
+                datos["anio"]
+                .strip(),
+
+            "serie":
+                datos["serie"]
+                .upper()
+                .strip(),
+
+            "motor":
+                datos["motor"]
+                .upper()
+                .strip(),
+
+            "color":
+                datos["color"]
+                .upper()
+                .strip(),
+
+            "nombre":
+                datos["nombre"]
+                .upper()
+                .strip(),
+
+            "combustible":
+                datos["combustible"]
+                .upper()
+                .strip(),
+
+            "cilindros":
+                datos["cilindros"]
+                .upper()
+                .strip(),
+
+            "tipo_auto":
+                datos["tipo_auto"]
+                .upper()
+                .strip(),
+
+            "presidencia":
+                datos["presidencia"]
+                .upper()
+                .strip()
+        }
+
+        # ============================================
+        # DESCONTAR CRÉDITOS
+        # ============================================
+
+        consumido = await consumir_creditos_cliente(
+            cliente_id,
+            creditos_necesarios
+        )
+
+        if not consumido:
+
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error":
+                        "No tienes permisos suficientes disponibles"
+                },
+                status_code=409
+            )
+
+        creditos_consumidos = (
+            creditos_necesarios
+        )
+
+        # ============================================
+        # PRIMER FOLIO
+        # ============================================
+
+        folio_1 = (
+            await generar_folio_async()
+        )
+
+        # ============================================
+        # 15 DÍAS
+        # ============================================
+
+        if vigencia == "1":
+
+            fecha_ven = (
+                fecha_exp
+                + timedelta(days=14)
+            )
+
+            pdf_datos = {
+                **datos_comunes,
+
+                "folio":
+                    folio_1,
+
+                "fecha_exp":
+                    fecha_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            pdf_path = await asyncio.to_thread(
+                generar_pdf,
+                pdf_datos
+            )
+
+            nombre_pdf = os.path.basename(
+                pdf_path
+            )
+
+            supabase_admin.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio":
+                    folio_1,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    cliente["usuario"],
+
+                "cliente_id":
+                    cliente_id,
+
+                "pdf_path":
+                    nombre_pdf
+
+            }).execute()
+
+            folios_creados.append(
+                folio_1
+            )
+
+            return {
+                "ok": True,
+                "tipo": "15",
+                "folio": folio_1,
+                "pdf_url":
+                    f"/cliente/descargar/{folio_1}"
+            }
+
+        # ============================================
+        # 30 DÍAS
+        # ============================================
+
+        if vigencia == "2":
+
+            fecha_ven = (
+                fecha_exp
+                + timedelta(days=29)
+            )
+
+            pdf_datos = {
+                **datos_comunes,
+
+                "folio":
+                    folio_1,
+
+                "fecha_exp":
+                    fecha_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            pdf_path = await asyncio.to_thread(
+                generar_pdf,
+                pdf_datos
+            )
+
+            nombre_pdf = os.path.basename(
+                pdf_path
+            )
+
+            supabase_admin.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio":
+                    folio_1,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    cliente["usuario"],
+
+                "cliente_id":
+                    cliente_id,
+
+                "pdf_path":
+                    nombre_pdf
+
+            }).execute()
+
+            folios_creados.append(
+                folio_1
+            )
+
+            return {
+                "ok": True,
+                "tipo": "30",
+                "folio": folio_1,
+                "pdf_url":
+                    f"/cliente/descargar/{folio_1}"
+            }
+
+        # ============================================
+        # 2 × 15
+        # ============================================
+
+        if vigencia == "3":
+
+            fecha_1_exp = fecha_exp
+
+            fecha_1_ven = (
+                fecha_1_exp
+                + timedelta(days=14)
+            )
+
+            fecha_2_exp = (
+                fecha_1_ven
+                + timedelta(days=1)
+            )
+
+            fecha_2_ven = (
+                fecha_2_exp
+                + timedelta(days=14)
+            )
+
+            folio_2 = (
+                await generar_folio_async()
+            )
+
+            while (
+                folio_2 == folio_1
+                or
+                _folio_existe(
+                    folio_2
+                )
+            ):
+
+                folio_2 = (
+                    await generar_folio_async()
+                )
+
+            pdf_datos_1 = {
+
+                **datos_comunes,
+
+                "folio":
+                    folio_1,
+
+                "fecha_exp":
+                    fecha_1_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_1_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            pdf_datos_2 = {
+
+                **datos_comunes,
+
+                "folio":
+                    folio_2,
+
+                "fecha_exp":
+                    fecha_2_exp.strftime(
+                        "%d-%m-%Y"
+                    ),
+
+                "fecha_ven":
+                    fecha_2_ven.strftime(
+                        "%d-%m-%Y"
+                    )
+            }
+
+            pdf_final = await asyncio.to_thread(
+                generar_pdf_2x1,
+                pdf_datos_1,
+                pdf_datos_2
+            )
+
+            nombre_pdf = os.path.basename(
+                pdf_final
+            )
+
+            # FOLIO 1
+            supabase_admin.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio":
+                    folio_1,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_1_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_1_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    cliente["usuario"],
+
+                "cliente_id":
+                    cliente_id,
+
+                "pdf_path":
+                    nombre_pdf
+
+            }).execute()
+
+            folios_creados.append(
+                folio_1
+            )
+
+            # FOLIO 2
+            supabase_admin.table(
+                "folios_registrados"
+            ).insert({
+
+                "folio":
+                    folio_2,
+
+                "marca":
+                    datos_comunes["marca"],
+
+                "linea":
+                    datos_comunes["linea"],
+
+                "anio":
+                    datos_comunes["anio"],
+
+                "numero_serie":
+                    datos_comunes["serie"],
+
+                "numero_motor":
+                    datos_comunes["motor"],
+
+                "color":
+                    datos_comunes["color"],
+
+                "contribuyente":
+                    datos_comunes["nombre"],
+
+                "fecha_expedicion":
+                    fecha_2_exp.isoformat(),
+
+                "fecha_vencimiento":
+                    fecha_2_ven.isoformat(),
+
+                "entidad":
+                    ENTIDAD,
+
+                "estado":
+                    "PENDIENTE",
+
+                "user_id":
+                    0,
+
+                "username":
+                    cliente["usuario"],
+
+                "cliente_id":
+                    cliente_id,
+
+                "pdf_path":
+                    nombre_pdf
+
+            }).execute()
+
+            folios_creados.append(
+                folio_2
+            )
+
+            return {
+
+                "ok":
+                    True,
+
+                "tipo":
+                    "2x1",
+
+                "folio_1":
+                    folio_1,
+
+                "folio_2":
+                    folio_2,
+
+                "pdf_url":
+                    f"/cliente/descargar/{folio_1}"
+            }
+
     except Exception as e:
 
         print(
-            "[PANEL CLIENTE]",
+            "[CLIENTE CREAR]",
             e
         )
 
-        raise HTTPException(
-            status_code=500,
-            detail="Error cargando cliente"
+        # Borrar registros parciales
+        for folio in folios_creados:
+
+            try:
+
+                supabase_admin.table(
+                    "folios_registrados"
+                ).delete().eq(
+                    "folio",
+                    folio
+                ).eq(
+                    "cliente_id",
+                    cliente_id
+                ).execute()
+
+            except Exception:
+                pass
+
+        # Regresar saldo
+        if creditos_consumidos > 0:
+
+            devolver_creditos_cliente(
+                cliente_id,
+                creditos_consumidos
+            )
+
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": str(e)
+            },
+            status_code=400
         )
+
+
+# ============================================================
+# MIS PERMISOS
+# ============================================================
+
+@app.get(
+    "/cliente/mis-permisos",
+    response_class=HTMLResponse
+)
+async def cliente_mis_permisos(
+    request: Request
+):
+
+    cliente = obtener_cliente_sesion(
+        request
+    )
+
+    if not cliente:
+
+        return RedirectResponse(
+            "/cliente/login",
+            status_code=302
+        )
+
+    cliente_id = int(
+        cliente["id"]
+    )
+
+    try:
+
+        resp = (
+            supabase_admin
+            .table(
+                "folios_registrados"
+            )
+            .select(
+                "folio,marca,linea,"
+                "contribuyente,"
+                "fecha_expedicion,"
+                "fecha_vencimiento,"
+                "pdf_path,creado_en"
+            )
+            .eq(
+                "cliente_id",
+                cliente_id
+            )
+            .order(
+                "creado_en",
+                desc=True
+            )
+            .execute()
+        )
+
+        folios = (
+            resp.data
+            or []
+        )
+
+    except Exception as e:
+
+        print(
+            "[MIS PERMISOS]",
+            e
+        )
+
+        folios = []
+
+    cards = ""
+
+    for f in folios:
+
+        folio = html_lib.escape(
+            str(
+                f.get(
+                    "folio",
+                    ""
+                )
+            )
+        )
+
+        marca = html_lib.escape(
+            str(
+                f.get(
+                    "marca",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        linea = html_lib.escape(
+            str(
+                f.get(
+                    "linea",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        titular = html_lib.escape(
+            str(
+                f.get(
+                    "contribuyente",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        exp = html_lib.escape(
+            str(
+                f.get(
+                    "fecha_expedicion",
+                    ""
+                )
+            )
+        )
+
+        ven = html_lib.escape(
+            str(
+                f.get(
+                    "fecha_vencimiento",
+                    ""
+                )
+            )
+        )
+
+        cards += f"""
+
+        <article class="permiso">
+
+            <div>
+
+                <h3>
+                    {folio}
+                </h3>
+
+                <p>
+                    {marca} {linea}
+                </p>
+
+                <small>
+                    {titular}
+                </small>
+
+                <div class="fechas">
+                    {exp} → {ven}
+                </div>
+
+            </div>
+
+
+            <a
+                href="/cliente/descargar/{folio}"
+            >
+                Descargar PDF
+            </a>
+
+        </article>
+
+        """
+
+    if not cards:
+
+        cards = """
+
+        <div class="vacio">
+            Todavía no has creado permisos.
+        </div>
+
+        """
+
+    return HTMLResponse(f"""
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+    Mis permisos
+</title>
+
+<style>
+
+:root {{
+    --vino:#5f1b2d;
+    --dorado:#c09761;
+}}
+
+* {{
+    box-sizing:border-box;
+}}
+
+body {{
+    margin:0;
+    background:#f4f4f4;
+    font-family:Arial,sans-serif;
+    color:#555;
+}}
+
+.menu {{
+    background:var(--vino);
+}}
+
+.menu-inner {{
+    max-width:1100px;
+    margin:auto;
+    display:flex;
+    justify-content:space-between;
+}}
+
+.menu a {{
+    color:white;
+    text-decoration:none;
+    padding:17px;
+    display:inline-block;
+}}
+
+.hero {{
+    position:relative;
+    text-align:center;
+    padding:50px 20px 90px;
+}}
+
+.hero::after {{
+    content:"";
+    position:absolute;
+    bottom:0;
+    left:0;
+    width:100%;
+    height:7px;
+    background:var(--dorado);
+}}
+
+.hero h1 {{
+    color:var(--vino);
+    font-weight:400;
+}}
+
+.panel {{
+    max-width:1000px;
+    margin:-55px auto 50px;
+    position:relative;
+    z-index:2;
+    background:white;
+    padding:35px;
+    border-radius:22px;
+    box-shadow:0 8px 32px rgba(0,0,0,.11);
+}}
+
+.permiso {{
+    display:flex;
+    justify-content:space-between;
+    gap:20px;
+    align-items:center;
+    border:1px solid #e6e6e6;
+    border-left:4px solid var(--dorado);
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:15px;
+}}
+
+.permiso h3 {{
+    margin:0 0 7px;
+    color:var(--vino);
+}}
+
+.permiso p {{
+    margin:0 0 4px;
+}}
+
+.fechas {{
+    margin-top:8px;
+    color:#888;
+    font-size:13px;
+}}
+
+.permiso a {{
+    background:var(--vino);
+    color:white;
+    text-decoration:none;
+    padding:10px 15px;
+    border-radius:8px;
+    white-space:nowrap;
+}}
+
+.vacio {{
+    text-align:center;
+    background:#f7f7f7;
+    padding:35px;
+    border-radius:12px;
+    color:#999;
+}}
+
+@media(max-width:600px) {{
+
+    .panel {{
+        margin:-45px 12px 30px;
+        padding:20px 15px;
+    }}
+
+    .permiso {{
+        display:block;
+    }}
+
+    .permiso a {{
+        display:inline-block;
+        margin-top:15px;
+    }}
+}}
+
+</style>
+
+</head>
+
+<body>
+
+
+<nav class="menu">
+
+<div class="menu-inner">
+
+<div>
+
+<a href="/cliente">
+    Inicio
+</a>
+
+<a href="/cliente/crear">
+    Crear permiso
+</a>
+
+<a href="/cliente/mis-permisos">
+    Mis permisos
+</a>
+
+</div>
+
+<a href="/cliente/logout">
+    Cerrar sesión
+</a>
+
+</div>
+
+</nav>
+
+
+<section class="hero">
+
+<h1>
+    Mis Permisos
+</h1>
+
+</section>
+
+
+<main class="panel">
+
+{cards}
+
+</main>
+
+
+</body>
+</html>
+""")
+
+
+# ============================================================
+# DESCARGAR PDF PROPIO
+# ============================================================
+
+@app.get(
+    "/cliente/descargar/{folio}"
+)
+async def cliente_descargar_pdf(
+    folio: str,
+    request: Request
+):
+
+    cliente = obtener_cliente_sesion(
+        request
+    )
+
+    if not cliente:
+
+        raise HTTPException(
+            status_code=401,
+            detail="No autorizado"
+        )
+
+    cliente_id = int(
+        cliente["id"]
+    )
+
+    folio = (
+        folio
+        .strip()
+        .upper()
+    )
+
+    resp = (
+        supabase_admin
+        .table(
+            "folios_registrados"
+        )
+        .select(
+            "folio,pdf_path"
+        )
+        .eq(
+            "folio",
+            folio
+        )
+        .eq(
+            "cliente_id",
+            cliente_id
+        )
+        .limit(1)
+        .execute()
+    )
+
+    if not resp.data:
+
+        raise HTTPException(
+            status_code=403,
+            detail=
+                "Este permiso no pertenece a tu cuenta"
+        )
+
+    pdf_path = (
+        resp.data[0]
+        .get(
+            "pdf_path"
+        )
+    )
+
+    if not pdf_path:
+
+        raise HTTPException(
+            status_code=404,
+            detail=
+                "Este permiso no tiene PDF registrado"
+        )
+
+    archivo = os.path.basename(
+        pdf_path
+    )
+
+    ruta = os.path.join(
+        OUTPUT_DIR,
+        archivo
+    )
+
+    if not os.path.exists(
+        ruta
+    ):
+
+        raise HTTPException(
+            status_code=404,
+            detail=
+                "El PDF ya no se encuentra en el servidor"
+        )
+
+    return FileResponse(
+        ruta,
+        media_type=
+            "application/pdf",
+        filename=
+            archivo
+    )
 
         
 @app.post("/admin/crear")
