@@ -6130,6 +6130,1736 @@ async def crear_permiso_post(request: Request):
 
         })
 
+@app.get("/admin/usuarios", response_class=HTMLResponse)
+async def admin_usuarios(request: Request):
+
+    if not request.session.get("admin"):
+        return RedirectResponse(
+            "/login",
+            status_code=302
+        )
+
+    try:
+
+        resp = (
+            supabase
+            .table("clientes_permisos")
+            .select("*")
+            .order(
+                "creado_en",
+                desc=True
+            )
+            .execute()
+        )
+
+        clientes = resp.data or []
+
+    except Exception as e:
+
+        print(
+            f"[ADMIN USUARIOS] Error: {e}"
+        )
+
+        clientes = []
+
+    filas_html = ""
+
+    for cliente in clientes:
+
+        cliente_id = int(
+            cliente.get(
+                "id",
+                0
+            )
+        )
+
+        usuario = html_lib.escape(
+            str(
+                cliente.get(
+                    "usuario",
+                    ""
+                )
+            )
+        )
+
+        nombre = html_lib.escape(
+            str(
+                cliente.get(
+                    "nombre",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        asignados = int(
+            cliente.get(
+                "permisos_asignados",
+                0
+            )
+            or 0
+        )
+
+        usados = int(
+            cliente.get(
+                "permisos_usados",
+                0
+            )
+            or 0
+        )
+
+        restantes = max(
+            0,
+            asignados - usados
+        )
+
+        if asignados > 0:
+
+            porcentaje = round(
+                (
+                    usados
+                    /
+                    asignados
+                )
+                *
+                100,
+                1
+            )
+
+        else:
+
+            porcentaje = 0
+
+        porcentaje_visual = min(
+            porcentaje,
+            100
+        )
+
+        activo = bool(
+            cliente.get(
+                "activo",
+                True
+            )
+        )
+
+        estado_texto = (
+            "ACTIVO"
+            if activo
+            else
+            "BLOQUEADO"
+        )
+
+        estado_clase = (
+            "activo"
+            if activo
+            else
+            "bloqueado"
+        )
+
+        boton_estado = (
+            "Bloquear"
+            if activo
+            else
+            "Desbloquear"
+        )
+
+        filas_html += f"""
+
+        <article class="cliente-card">
+
+            <div class="cliente-top">
+
+                <div>
+
+                    <h3>
+                        {usuario}
+                    </h3>
+
+                    <p>
+                        {nombre if nombre else "Sin nombre registrado"}
+                    </p>
+
+                </div>
+
+
+                <span
+                    class="estado {estado_clase}"
+                >
+                    {estado_texto}
+                </span>
+
+            </div>
+
+
+            <div class="numeros">
+
+                <div class="numero">
+
+                    <span>
+                        Asignados
+                    </span>
+
+                    <strong>
+                        {asignados}
+                    </strong>
+
+                </div>
+
+
+                <div class="numero">
+
+                    <span>
+                        Usados
+                    </span>
+
+                    <strong>
+                        {usados}
+                    </strong>
+
+                </div>
+
+
+                <div class="numero">
+
+                    <span>
+                        Restantes
+                    </span>
+
+                    <strong>
+                        {restantes}
+                    </strong>
+
+                </div>
+
+
+                <div class="numero">
+
+                    <span>
+                        Consumo
+                    </span>
+
+                    <strong>
+                        {porcentaje}%
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="barra-fondo">
+
+                <div
+                    class="barra-progreso"
+                    style="
+                        width:{porcentaje_visual}%;
+                    "
+                ></div>
+
+            </div>
+
+
+            <div class="barra-texto">
+
+                {usados} de {asignados}
+                permisos utilizados
+
+            </div>
+
+
+            <div class="acciones-cliente">
+
+
+                <button
+                    onclick="
+                        recargar(
+                            {cliente_id},
+                            10
+                        )
+                    "
+                >
+                    +10
+                </button>
+
+
+                <button
+                    onclick="
+                        recargar(
+                            {cliente_id},
+                            20
+                        )
+                    "
+                >
+                    +20
+                </button>
+
+
+                <button
+                    onclick="
+                        recargar(
+                            {cliente_id},
+                            50
+                        )
+                    "
+                >
+                    +50
+                </button>
+
+
+                <button
+                    onclick="
+                        recargar(
+                            {cliente_id},
+                            100
+                        )
+                    "
+                >
+                    +100
+                </button>
+
+
+                <button
+                    onclick="
+                        recargar(
+                            {cliente_id},
+                            1000
+                        )
+                    "
+                >
+                    +1000
+                </button>
+
+
+                <button
+                    class="personalizado"
+                    onclick="
+                        recargaPersonalizada(
+                            {cliente_id}
+                        )
+                    "
+                >
+                    Otra cantidad
+                </button>
+
+
+                <button
+                    class="estado-btn"
+                    onclick="
+                        cambiarEstado(
+                            {cliente_id},
+                            {str(not activo).lower()}
+                        )
+                    "
+                >
+                    {boton_estado}
+                </button>
+
+            </div>
+
+        </article>
+
+        """
+
+    if not filas_html:
+
+        filas_html = """
+
+        <div class="vacio">
+
+            Todavía no hay cuentas de clientes.
+
+        </div>
+
+        """
+
+    return HTMLResponse(f"""
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+    Administración de usuarios
+</title>
+
+
+<style>
+
+:root {{
+
+    --vino:#5f1b2d;
+    --vino-oscuro:#48101e;
+    --dorado:#c09761;
+    --gris:#858585;
+    --gris-claro:#f5f5f5;
+    --verde:#198754;
+    --rojo:#b02a37;
+}}
+
+* {{
+
+    box-sizing:border-box;
+
+    margin:0;
+
+    padding:0;
+}}
+
+body {{
+
+    background:#f4f4f4;
+
+    color:#555;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+}}
+
+
+/* =====================================================
+   HEADER
+===================================================== */
+
+.header {{
+
+    background:white;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0,0,0,.08);
+}}
+
+.header-inner {{
+
+    max-width:1380px;
+
+    margin:auto;
+
+    padding:
+        18px 30px;
+
+    display:flex;
+
+    justify-content:
+        space-between;
+
+    align-items:center;
+
+    gap:30px;
+}}
+
+.logos {{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:22px;
+}}
+
+.logo-gob {{
+
+    width:245px;
+}}
+
+.logo-secretaria {{
+
+    width:225px;
+}}
+
+.frase-header {{
+
+    width:300px;
+}}
+
+
+/* =====================================================
+   MENU
+===================================================== */
+
+.menu {{
+
+    background:
+        var(--vino);
+}}
+
+.menu-inner {{
+
+    max-width:1380px;
+
+    margin:auto;
+
+    padding:
+        0 30px;
+
+    display:flex;
+
+    justify-content:
+        space-between;
+
+    align-items:center;
+}}
+
+.menu-links {{
+
+    display:flex;
+
+    overflow-x:auto;
+}}
+
+.menu a {{
+
+    display:block;
+
+    padding:
+        17px 15px;
+
+    color:white;
+
+    text-decoration:none;
+
+    font-size:14px;
+
+    white-space:nowrap;
+}}
+
+.menu a:hover,
+.menu a.active {{
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .12
+        );
+}}
+
+.menu .cerrar {{
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            .16
+        );
+
+    border-radius:7px;
+
+    padding:
+        10px 15px;
+}}
+
+
+/* =====================================================
+   HERO
+===================================================== */
+
+.hero {{
+
+    position:relative;
+
+    background:
+
+        linear-gradient(
+            120deg,
+            #f8f8f8,
+            #eeeeee
+        );
+
+    padding:
+        50px 20px
+        90px;
+
+    text-align:center;
+}}
+
+.hero::after {{
+
+    content:"";
+
+    position:absolute;
+
+    bottom:0;
+
+    left:0;
+
+    width:100%;
+
+    height:7px;
+
+    background:
+        var(--dorado);
+}}
+
+.hero h1 {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        34px;
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        8px;
+}}
+
+.hero p {{
+
+    color:
+        var(--gris);
+
+    font-size:
+        16px;
+}}
+
+
+/* =====================================================
+   CONTENIDO
+===================================================== */
+
+.contenido {{
+
+    padding:
+        0 20px
+        60px;
+}}
+
+.panel {{
+
+    position:relative;
+
+    z-index:2;
+
+    max-width:1100px;
+
+    margin:
+        -55px auto
+        40px;
+
+    background:white;
+
+    padding:
+        38px 40px;
+
+    border-radius:
+        24px;
+
+    box-shadow:
+        0 8px 32px
+        rgba(
+            0,
+            0,
+            0,
+            .11
+        );
+}}
+
+
+/* =====================================================
+   CREAR CUENTA
+===================================================== */
+
+.titulo {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        24px;
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        6px;
+}}
+
+.subtitulo {{
+
+    color:#888;
+
+    font-size:
+        14px;
+
+    margin-bottom:
+        24px;
+}}
+
+.crear-box {{
+
+    background:
+        #faf7f3;
+
+    border-left:
+        4px solid
+        var(--dorado);
+
+    border-radius:
+        12px;
+
+    padding:
+        22px;
+
+    margin-bottom:
+        35px;
+}}
+
+.grid {{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        16px;
+}}
+
+label {{
+
+    display:block;
+
+    color:#666;
+
+    font-size:
+        12px;
+
+    font-weight:
+        bold;
+
+    text-transform:
+        uppercase;
+
+    margin-bottom:
+        7px;
+}}
+
+input {{
+
+    width:100%;
+
+    border:
+        1px solid
+        #d4d4d4;
+
+    background:white;
+
+    padding:
+        13px 14px;
+
+    border-radius:
+        8px;
+
+    font-size:
+        15px;
+
+    outline:none;
+}}
+
+input:focus {{
+
+    border-color:
+        var(--dorado);
+
+    box-shadow:
+        0 0 0
+        3px rgba(
+            192,
+            151,
+            97,
+            .15
+        );
+}}
+
+.campo {{
+
+    margin-bottom:
+        16px;
+}}
+
+.crear-btn {{
+
+    border:0;
+
+    background:
+        var(--dorado);
+
+    color:white;
+
+    padding:
+        13px 23px;
+
+    border-radius:
+        8px;
+
+    cursor:pointer;
+
+    font-weight:
+        bold;
+
+    font-size:
+        15px;
+}}
+
+.crear-btn:hover {{
+
+    background:
+        #ad804c;
+}}
+
+
+/* =====================================================
+   CLIENTES
+===================================================== */
+
+.seccion-titulo {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        22px;
+
+    font-weight:
+        400;
+
+    padding-bottom:
+        12px;
+
+    margin-bottom:
+        20px;
+
+    border-bottom:
+        1px solid
+        #e8e8e8;
+}}
+
+.cliente-card {{
+
+    border:
+        1px solid
+        #e5e5e5;
+
+    border-radius:
+        14px;
+
+    padding:
+        22px;
+
+    margin-bottom:
+        18px;
+
+    background:
+        white;
+}}
+
+.cliente-top {{
+
+    display:flex;
+
+    justify-content:
+        space-between;
+
+    align-items:
+        flex-start;
+
+    gap:
+        20px;
+
+    margin-bottom:
+        20px;
+}}
+
+.cliente-top h3 {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        21px;
+
+    margin-bottom:
+        4px;
+}}
+
+.cliente-top p {{
+
+    color:#888;
+
+    font-size:
+        13px;
+}}
+
+.estado {{
+
+    font-size:
+        11px;
+
+    font-weight:
+        bold;
+
+    padding:
+        7px 10px;
+
+    border-radius:
+        20px;
+}}
+
+.estado.activo {{
+
+    background:
+        #dff3e8;
+
+    color:
+        var(--verde);
+}}
+
+.estado.bloqueado {{
+
+    background:
+        #f6dfe2;
+
+    color:
+        var(--rojo);
+}}
+
+
+/* =====================================================
+   NUMEROS
+===================================================== */
+
+.numeros {{
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            1fr
+        );
+
+    gap:
+        10px;
+
+    margin-bottom:
+        17px;
+}}
+
+.numero {{
+
+    background:
+        var(--gris-claro);
+
+    border-radius:
+        10px;
+
+    padding:
+        14px;
+}}
+
+.numero span {{
+
+    display:block;
+
+    color:#888;
+
+    font-size:
+        11px;
+
+    text-transform:
+        uppercase;
+
+    margin-bottom:
+        6px;
+}}
+
+.numero strong {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        24px;
+}}
+
+
+/* =====================================================
+   BARRA
+===================================================== */
+
+.barra-fondo {{
+
+    width:100%;
+
+    height:14px;
+
+    background:
+        #eeeeee;
+
+    border-radius:
+        30px;
+
+    overflow:hidden;
+}}
+
+.barra-progreso {{
+
+    height:100%;
+
+    background:
+
+        linear-gradient(
+            90deg,
+            var(--dorado),
+            var(--vino)
+        );
+
+    border-radius:
+        30px;
+}}
+
+.barra-texto {{
+
+    color:#888;
+
+    font-size:
+        12px;
+
+    margin-top:
+        7px;
+
+    margin-bottom:
+        17px;
+}}
+
+
+/* =====================================================
+   ACCIONES
+===================================================== */
+
+.acciones-cliente {{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    gap:
+        8px;
+}}
+
+.acciones-cliente button {{
+
+    border:0;
+
+    background:
+        #eeeeee;
+
+    color:#555;
+
+    padding:
+        9px 13px;
+
+    border-radius:
+        7px;
+
+    cursor:pointer;
+}}
+
+.acciones-cliente button:hover {{
+
+    background:
+        #dddddd;
+}}
+
+.acciones-cliente
+.personalizado {{
+
+    background:
+        #faf7f3;
+
+    color:
+        var(--vino);
+}}
+
+.acciones-cliente
+.estado-btn {{
+
+    margin-left:auto;
+
+    background:
+        var(--vino);
+
+    color:white;
+}}
+
+.vacio {{
+
+    text-align:center;
+
+    padding:
+        35px;
+
+    color:#999;
+
+    background:
+        #f7f7f7;
+
+    border-radius:
+        12px;
+}}
+
+
+/* =====================================================
+   MENSAJES
+===================================================== */
+
+.mensaje {{
+
+    display:none;
+
+    margin-bottom:
+        20px;
+
+    border-radius:
+        9px;
+
+    padding:
+        14px 16px;
+}}
+
+.mensaje.ok {{
+
+    background:
+        #e3f3e8;
+
+    color:
+        #155724;
+}}
+
+.mensaje.error {{
+
+    background:
+        #f8d7da;
+
+    color:
+        #721c24;
+}}
+
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media(max-width:700px) {{
+
+    .header-inner {{
+
+        display:block;
+
+        padding:
+            15px;
+    }}
+
+    .logos {{
+
+        justify-content:
+            center;
+
+        gap:
+            8px;
+    }}
+
+    .logo-gob {{
+
+        width:50%;
+    }}
+
+    .logo-secretaria {{
+
+        width:43%;
+    }}
+
+    .frase-header {{
+
+        display:none;
+    }}
+
+    .menu-inner {{
+
+        padding:
+            0 10px;
+
+        display:block;
+    }}
+
+    .menu-links {{
+
+        overflow-x:auto;
+    }}
+
+    .menu .cerrar {{
+
+        text-align:center;
+
+        margin:
+            6px 0 10px;
+    }}
+
+    .hero h1 {{
+
+        font-size:
+            27px;
+    }}
+
+    .panel {{
+
+        padding:
+            24px 16px;
+
+        border-radius:
+            17px;
+    }}
+
+    .grid {{
+
+        grid-template-columns:
+            1fr;
+    }}
+
+    .numeros {{
+
+        grid-template-columns:
+            1fr 1fr;
+    }}
+
+    .acciones-cliente
+    .estado-btn {{
+
+        margin-left:0;
+    }}
+
+}}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<header class="header">
+
+<div class="header-inner">
+
+
+<div class="logos">
+
+<img
+    class="logo-gob"
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
+>
+
+
+<img
+    class="logo-secretaria"
+    src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
+>
+
+</div>
+
+
+<img
+    class="frase-header"
+    src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
+>
+
+
+</div>
+
+</header>
+
+
+<nav class="menu">
+
+<div class="menu-inner">
+
+
+<div class="menu-links">
+
+<a href="/admin">
+    Inicio
+</a>
+
+<a href="/admin/crear">
+    Crear permiso
+</a>
+
+<a href="/admin/folios">
+    Gestionar folios
+</a>
+
+<a
+    href="/admin/usuarios"
+    class="active"
+>
+    Usuarios
+</a>
+
+<a href="/admin/tablas">
+    Tablas
+</a>
+
+<a href="/admin/auditoria">
+    Auditoría
+</a>
+
+</div>
+
+
+<a
+    href="/logout"
+    class="cerrar"
+>
+    Cerrar sesión
+</a>
+
+
+</div>
+
+</nav>
+
+
+<section class="hero">
+
+<h1>
+    Usuarios
+</h1>
+
+<p>
+    Administración de cuentas y paquetes de permisos
+</p>
+
+</section>
+
+
+<main class="contenido">
+
+
+<section class="panel">
+
+
+<div
+    id="mensaje"
+    class="mensaje"
+></div>
+
+
+<h2 class="titulo">
+    Crear nueva cuenta
+</h2>
+
+<p class="subtitulo">
+
+    Asigne un usuario,
+    contraseña y paquete inicial.
+
+</p>
+
+
+<div class="crear-box">
+
+
+<form id="crearUsuario">
+
+
+<div class="grid">
+
+
+<div class="campo">
+
+<label>
+    Nombre / Cliente
+</label>
+
+<input
+    name="nombre"
+    type="text"
+    placeholder="Ej: Agencia López"
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Usuario
+</label>
+
+<input
+    name="usuario"
+    type="text"
+    required
+    autocomplete="off"
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Contraseña
+</label>
+
+<input
+    name="password"
+    type="password"
+    minlength="6"
+    required
+    autocomplete="new-password"
+>
+
+</div>
+
+
+<div class="campo">
+
+<label>
+    Permisos iniciales
+</label>
+
+<input
+    name="permisos"
+    type="number"
+    min="0"
+    max="1000000"
+    value="20"
+    required
+>
+
+</div>
+
+
+</div>
+
+
+<button
+    class="crear-btn"
+    type="submit"
+>
+    + Crear cuenta
+</button>
+
+
+</form>
+
+
+</div>
+
+
+<h2 class="seccion-titulo">
+
+    Cuentas registradas
+
+</h2>
+
+
+<div id="clientes">
+
+    {filas_html}
+
+</div>
+
+
+</section>
+
+
+</main>
+
+
+<script>
+
+
+function mostrarMensaje(
+    texto,
+    tipo
+) {{
+
+    const caja =
+        document.getElementById(
+            "mensaje"
+        );
+
+    caja.className =
+        "mensaje " + tipo;
+
+    caja.textContent =
+        texto;
+
+    caja.style.display =
+        "block";
+
+    window.scrollTo({{
+        top:0,
+        behavior:"smooth"
+    }});
+}}
+
+
+document
+.getElementById(
+    "crearUsuario"
+)
+.addEventListener(
+    "submit",
+    async function(e) {{
+
+        e.preventDefault();
+
+        const form =
+            new FormData(this);
+
+        const datos =
+            Object.fromEntries(
+                form
+            );
+
+        const res =
+            await fetch(
+                "/admin/usuarios/crear",
+                {{
+                    method:"POST",
+
+                    headers:{{
+                        "Content-Type":
+                            "application/json"
+                    }},
+
+                    body:
+                        JSON.stringify(
+                            datos
+                        )
+                }}
+            );
+
+        const result =
+            await res.json();
+
+        if(result.ok) {{
+
+            mostrarMensaje(
+                "Cuenta creada correctamente",
+                "ok"
+            );
+
+            setTimeout(
+                () =>
+                    location.reload(),
+                600
+            );
+
+        }} else {{
+
+            mostrarMensaje(
+                result.error
+                ||
+                "No fue posible crear la cuenta",
+                "error"
+            );
+        }}
+
+    }}
+);
+
+
+async function recargar(
+    clienteId,
+    cantidad
+) {{
+
+    const confirmar =
+        confirm(
+            "¿Agregar "
+            + cantidad
+            + " permisos a esta cuenta?"
+        );
+
+    if(!confirmar)
+        return;
+
+
+    const res =
+        await fetch(
+            "/admin/usuarios/"
+            + clienteId
+            + "/recargar",
+            {{
+                method:"POST",
+
+                headers:{{
+                    "Content-Type":
+                        "application/json"
+                }},
+
+                body:
+                    JSON.stringify({{
+                        cantidad:cantidad
+                    }})
+            }}
+        );
+
+    const result =
+        await res.json();
+
+
+    if(result.ok) {{
+
+        location.reload();
+
+    }} else {{
+
+        alert(
+            result.error
+            ||
+            "Error al recargar"
+        );
+    }}
+
+}}
+
+
+function recargaPersonalizada(
+    clienteId
+) {{
+
+    const valor =
+        prompt(
+            "¿Cuántos permisos quieres agregar?"
+        );
+
+    if(valor === null)
+        return;
+
+    const cantidad =
+        parseInt(
+            valor
+        );
+
+    if(
+        !cantidad
+        ||
+        cantidad <= 0
+    ) {{
+
+        alert(
+            "Cantidad inválida"
+        );
+
+        return;
+    }}
+
+    recargar(
+        clienteId,
+        cantidad
+    );
+}}
+
+
+async function cambiarEstado(
+    clienteId,
+    nuevoEstado
+) {{
+
+    const texto =
+        nuevoEstado
+        ?
+        "desbloquear"
+        :
+        "bloquear";
+
+    if(
+        !confirm(
+            "¿Seguro que quieres "
+            + texto
+            + " esta cuenta?"
+        )
+    )
+        return;
+
+
+    const res =
+        await fetch(
+            "/admin/usuarios/"
+            + clienteId
+            + "/estado",
+            {{
+                method:"POST",
+
+                headers:{{
+                    "Content-Type":
+                        "application/json"
+                }},
+
+                body:
+                    JSON.stringify({{
+                        activo:
+                            nuevoEstado
+                    }})
+            }}
+        );
+
+
+    const result =
+        await res.json();
+
+
+    if(result.ok) {{
+
+        location.reload();
+
+    }} else {{
+
+        alert(
+            result.error
+            ||
+            "No fue posible modificar la cuenta"
+        );
+    }}
+
+}}
+
+
+</script>
+
+
+</body>
+
+</html>
+""")
+
 @app.get("/admin/descargar/{archivo}")
 async def descargar_pdf(
     archivo: str,
