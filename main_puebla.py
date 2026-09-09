@@ -5,6 +5,7 @@ from fastapi.responses import (
     JSONResponse,
     FileResponse
 )
+from admin_tablas import crear_router_admin_tablas
 import hashlib
 import secrets
 import hmac
