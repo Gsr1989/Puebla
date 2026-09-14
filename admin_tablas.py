@@ -177,6 +177,123 @@ def crear_router_admin_tablas(
         cats = await catalogo(force=bool(refresh))
         return {"ok": True, "tables": list(cats.values()), "count": len(cats)}
 
+    @router.get("/admin/api/db/global-search")
+    async def api_global_search(request: Request, q: str, per_table: int = 10, max_results: int = 100):
+        """Busca un mismo término en TODAS las tablas expuestas por Supabase REST."""
+        exigir_admin(request)
+        term = re.sub(r"[(),]", " ", str(q or "").strip())[:120]
+        if not term:
+            return {"ok": True, "q": "", "results": [], "tables_searched": 0, "tables_with_matches": 0, "total_matches": 0}
+
+        cats = await catalogo()
+        per_table = min(25, max(1, int(per_table)))
+        max_results = min(250, max(1, int(max_results)))
+        semaphore = asyncio.Semaphore(6)
+
+        preferred = [
+            "folio", "marca", "linea", "modelo", "anio", "año",
+            "numero_serie", "serie", "vin", "numero_motor", "motor",
+            "color", "contribuyente", "nombre", "nombre_completo",
+            "titular", "entidad", "estado", "username", "user_id",
+        ]
+        temporal_formats = {
+            "date", "date-time", "datetime", "time", "timestamp",
+            "timestamp with time zone", "timestamp without time zone", "timestamptz",
+        }
+        uuid_re = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}")
+
+        def clauses_for(meta: dict[str, Any]) -> list[str]:
+            by_name = {c["name"]: c for c in meta.get("columns", [])}
+            ordered, seen = [], set()
+            for name in preferred:
+                if name in by_name and name not in seen:
+                    ordered.append(by_name[name]); seen.add(name)
+            for c in meta.get("columns", []):
+                if c["name"] not in seen:
+                    ordered.append(c); seen.add(c["name"])
+
+            clauses = []
+            for c in ordered[:50]:
+                name = c["name"]
+                typ = str(c.get("type") or "string").lower()
+                fmt = str(c.get("format") or "").lower()
+                if fmt in temporal_formats:
+                    if re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ].*)?", term):
+                        clauses.append(f"{name}.eq.{term}")
+                    continue
+                if fmt == "uuid":
+                    if uuid_re.fullmatch(term):
+                        clauses.append(f"{name}.eq.{term}")
+                    continue
+                if typ == "string":
+                    clauses.append(f"{name}.ilike.%{term}%")
+                    continue
+                if typ in {"integer", "number"}:
+                    try:
+                        int(term) if typ == "integer" else float(term)
+                        clauses.append(f"{name}.eq.{term}")
+                    except ValueError:
+                        pass
+            return clauses
+
+        async def search_table(meta: dict[str, Any]):
+            clauses = clauses_for(meta)
+            if not clauses:
+                return None
+            table = meta["name"]
+            async with semaphore:
+                def run():
+                    return (supabase_admin.table(table)
+                            .select("*")
+                            .or_(",".join(clauses))
+                            .range(0, per_table - 1)
+                            .execute())
+                try:
+                    resp = await asyncio.to_thread(run)
+                    rows = resp.data or []
+                    if not rows:
+                        return None
+                    for row in rows:
+                        row["__admin_key"] = clave_fila(row, meta)
+                    return {"table": table, "meta": meta, "rows": rows, "count": len(rows)}
+                except Exception as exc:
+                    # Una tabla rara no debe tumbar la búsqueda global completa.
+                    return {"table": table, "meta": meta, "rows": [], "count": 0, "skipped_error": str(exc)}
+
+        found = await asyncio.gather(*(search_table(m) for m in cats.values()))
+        found = [x for x in found if x and x.get("rows")]
+
+        # Prioriza coincidencias en folio/serie/VIN y luego conserva orden alfabético de tabla.
+        needle = term.casefold()
+        def rank(group):
+            score = 0
+            for row in group["rows"]:
+                for key in ("folio", "numero_serie", "serie", "vin"):
+                    val = row.get(key)
+                    if val is not None and str(val).casefold() == needle:
+                        score += 100
+                    elif val is not None and needle in str(val).casefold():
+                        score += 20
+            return (-score, group["table"].lower())
+        found.sort(key=rank)
+
+        kept, used = [], 0
+        for group in found:
+            if used >= max_results:
+                break
+            rows = group["rows"][:max_results-used]
+            if rows:
+                group["rows"] = rows
+                group["count"] = len(rows)
+                kept.append(group)
+                used += len(rows)
+
+        return {
+            "ok": True, "q": term, "results": kept,
+            "tables_searched": len(cats), "tables_with_matches": len(kept),
+            "total_matches": used,
+        }
+
     @router.get("/admin/api/db/rows")
     async def api_rows(
         request: Request,
@@ -432,9 +549,9 @@ main{padding:22px;min-width:0}.card{background:#fff;border-radius:16px;box-shado
 .toolbar{display:grid;grid-template-columns:minmax(220px,2fr) repeat(3,minmax(130px,1fr)) auto auto;gap:10px;margin-top:16px}.toolbar input,.toolbar select{padding:10px 11px;border:1px solid #ddd;border-radius:9px;min-width:0}.btn{border:0;border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:700}.primary{background:var(--vino);color:#fff}.gold{background:var(--dorado);color:#fff}.danger{background:var(--bad);color:#fff}.light{background:#eee;color:#555}.btn:disabled{opacity:.45;cursor:not-allowed}
 .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.chip{border:1px solid #ddd;background:#fff;padding:7px 11px;border-radius:18px;cursor:pointer}.chip.active{background:var(--vino);border-color:var(--vino);color:#fff}
 .bulk{display:none;align-items:center;gap:10px;padding:10px 14px;background:#fff4e8;border-bottom:1px solid #f0d5b8}.bulk.show{display:flex}.table-wrap{overflow:auto;max-height:65vh}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{padding:10px 12px;border-bottom:1px solid #eee;text-align:left;max-width:330px;overflow:hidden;text-overflow:ellipsis}th{position:sticky;top:0;background:#fafafa;z-index:3;color:#666;cursor:pointer}tr:hover td{background:#fffdfb}.pk{font-weight:700;color:var(--vino)}.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700}.vig{background:#dff4e7;color:#176a3a}.ven{background:#fde3e5;color:#9d2630}.null{color:#aaa;font-style:italic}.editable{cursor:cell}.editable:hover{outline:1px dashed var(--dorado);outline-offset:-3px}.cell-input{min-width:140px;padding:7px;border:1px solid var(--dorado);border-radius:6px}
-.pager{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line)}.pager .pages{display:flex;gap:7px;align-items:center}.empty{padding:60px 20px;text-align:center;color:#999}.error{margin:15px 0;padding:12px;background:#fde7e9;color:#8c2630;border-radius:9px;display:none}.loading{opacity:.6;pointer-events:none}
+.pager{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line)}.pager .pages{display:flex;gap:7px;align-items:center}.empty{padding:60px 20px;text-align:center;color:#999}.error{margin:15px 0;padding:12px;background:#fde7e9;color:#8c2630;border-radius:9px;display:none}.loading{opacity:.6;pointer-events:none}.global-box{background:#fff;border:2px solid var(--dorado);border-radius:16px;padding:18px;margin-bottom:18px;box-shadow:0 4px 18px rgba(0,0,0,.06)}.global-box h2{margin:0;color:var(--vino);font-size:20px}.global-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-top:12px}.global-search input{width:100%;padding:13px 14px;border:1px solid #ccc;border-radius:10px;font-size:16px}.global-summary{font-size:13px;color:#777;margin-top:10px}.global-results{display:grid;gap:12px;margin-top:14px}.global-group{border:1px solid #e6e6e6;border-radius:12px;overflow:hidden}.global-group-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:#faf7f3;color:var(--vino);font-weight:700}.global-row{padding:11px 12px;border-top:1px solid #eee}.global-fields{display:flex;flex-wrap:wrap;gap:7px 14px;font-size:12px}.global-field b{color:#666}.global-actions{margin-top:9px}.global-empty{padding:16px;text-align:center;color:#888}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:100}.modal-bg.show{display:flex}.modal{width:min(850px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:22px}.modal h3{margin:0 0 16px;color:var(--vino)}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;font-size:12px;font-weight:700;color:#666;margin-bottom:5px}.field input,.field textarea,.field select{width:100%;padding:9px;border:1px solid #ddd;border-radius:8px}.field textarea{min-height:78px}.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
-@media(max-width:900px){.layout{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line);max-height:220px}.toolbar{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}}@media(max-width:560px){main{padding:10px}.toolbar{grid-template-columns:1fr}.heading h2{font-size:20px}header{padding:14px}.layout{min-height:auto}}
+@media(max-width:900px){.layout{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line);max-height:220px}.toolbar{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}}@media(max-width:560px){.global-search{grid-template-columns:1fr}.global-search .btn{width:100%}main{padding:10px}.toolbar{grid-template-columns:1fr}.heading h2{font-size:20px}header{padding:14px}.layout{min-height:auto}}
 </style>
 </head>
 <body>
@@ -443,6 +560,12 @@ main{padding:22px;min-width:0}.card{background:#fff;border-radius:16px;box-shado
 <aside><div class="side-title">Tablas disponibles</div><input id="tableSearch" placeholder="Buscar tabla..."><div id="tables"></div></aside>
 <main>
 <div id="error" class="error"></div>
+<section class="global-box" id="globalBox">
+<h2>🔎 Buscar en TODA Supabase</h2>
+<div class="small">No necesitas saber en qué tabla está. Escribe folio, VIN/serie, motor, marca, línea, año, color, nombre, etc.</div>
+<div class="global-search"><input id="globalQ" placeholder="Ej. P0722116 o 3B7JC3672RM527694" autocomplete="off"><button class="btn primary" id="globalBtn">Buscar en todo</button></div>
+<div class="global-summary" id="globalSummary"></div><div class="global-results" id="globalResults"></div>
+</section>
 <section class="card" id="card">
 <div class="top">
 <div class="heading"><div><h2 id="title">Selecciona una tabla</h2><div class="small" id="metaText">Cargando esquema...</div></div><div><button class="btn light" id="refreshBtn">↻ Actualizar</button> <button class="btn gold" id="addBtn" disabled>＋ Agregar registro</button></div></div>
@@ -460,6 +583,10 @@ const S={tables:[],table:null,meta:null,rows:[],page:1,pages:1,total:0,vigencia:
 const $=s=>document.querySelector(s); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function err(m){const e=$('#error');e.textContent=m;e.style.display='block';setTimeout(()=>e.style.display='none',8000)}
 async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch{} if(!r.ok||d.ok===false)throw new Error(d.detail||d.error||('HTTP '+r.status));return d}
+function shortVal(v){if(v===null||v===undefined)return 'NULL';if(typeof v==='object')return JSON.stringify(v);return String(v)}
+function importantEntries(row){const preferred=['folio','marca','linea','modelo','anio','año','numero_serie','serie','vin','numero_motor','motor','color','nombre','contribuyente','titular','entidad','estado','fecha_vencimiento'];const out=[],seen=new Set();for(const k of preferred){if(k in row&&row[k]!==null&&row[k]!==''&&!k.startsWith('__')){out.push([k,row[k]]);seen.add(k)}}for(const [k,v] of Object.entries(row)){if(out.length>=14)break;if(!k.startsWith('__')&&!seen.has(k)&&v!==null&&v!=='')out.push([k,v])}return out}
+async function globalSearch(){const q=$('#globalQ').value.trim();if(!q){$('#globalSummary').textContent='Escribe algo para buscar en todas las tablas.';$('#globalResults').innerHTML='';return}const btn=$('#globalBtn');btn.disabled=true;btn.textContent='Buscando...';$('#globalSummary').textContent='Revisando todas las tablas...';$('#globalResults').innerHTML='';try{const d=await api('/admin/api/db/global-search?q='+encodeURIComponent(q));$('#globalSummary').textContent=`${d.total_matches} coincidencia(s) en ${d.tables_with_matches} tabla(s), de ${d.tables_searched} revisadas.`;if(!d.results.length){$('#globalResults').innerHTML='<div class="global-empty">No se encontró ese valor en ninguna tabla expuesta.</div>';return}$('#globalResults').innerHTML=d.results.map(g=>`<div class="global-group"><div class="global-group-head"><span>Tabla: ${esc(g.table)}</span><span>${g.rows.length} resultado(s)</span></div>${g.rows.map(r=>`<div class="global-row"><div class="global-fields">${importantEntries(r).map(([k,v])=>`<span class="global-field"><b>${esc(k)}:</b> ${esc(shortVal(v))}</span>`).join('')}</div><div class="global-actions"><button class="btn light globalOpen" data-t="${esc(g.table)}" data-q="${esc(q)}">Abrir en esta tabla</button></div></div>`).join('')}</div>`).join('');document.querySelectorAll('.globalOpen').forEach(b=>b.onclick=()=>{selectTable(b.dataset.t);$('#q').value=b.dataset.q;S.page=1;loadRows();document.getElementById('card').scrollIntoView({behavior:'smooth'})})}catch(e){err(e.message);$('#globalSummary').textContent='La búsqueda global falló.'}finally{btn.disabled=false;btn.textContent='Buscar en todo'}}
+$('#globalBtn').onclick=globalSearch;$('#globalQ').onkeydown=e=>{if(e.key==='Enter')globalSearch()};
 async function loadSchema(refresh=0){try{const d=await api('/admin/api/db/schema?refresh='+refresh);S.tables=d.tables||[];renderTables();$('#metaText').textContent=S.tables.length+' tablas expuestas por Supabase REST';if(!S.table&&S.tables.length)selectTable(S.tables[0].name)}catch(e){err(e.message)}}
 function renderTables(){const f=$('#tableSearch').value.toLowerCase();$('#tables').innerHTML=S.tables.filter(t=>t.name.toLowerCase().includes(f)).map(t=>`<button class="table-btn ${S.table===t.name?'active':''}" data-t="${esc(t.name)}">${esc(t.name)}</button>`).join('');document.querySelectorAll('.table-btn').forEach(b=>b.onclick=()=>selectTable(b.dataset.t))}
 function selectTable(name){S.table=name;S.meta=S.tables.find(t=>t.name===name);S.page=1;S.sort='';S.selected.clear();$('#title').textContent=name;$('#addBtn').disabled=false;$('#vigFilters').style.display=S.meta?.has_expiration?'flex':'none';renderTables();loadRows()}
