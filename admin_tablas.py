@@ -203,15 +203,61 @@ def crear_router_admin_tablas(
             query = supabase_admin.table(table).select("*", count="exact")
 
             if q.strip():
-                # PostgREST OR solamente sobre columnas textuales para no provocar errores de tipo.
-                text_cols = [
-                    c["name"] for c in meta["columns"]
-                    if c.get("type") == "string" and c["name"] not in {"created_at", "updated_at"}
-                ][:18]
+                # Buscador universal: una sola caja busca el mismo valor en todas las
+                # columnas compatibles de la tabla. En texto usa coincidencia parcial
+                # (ILIKE, sin importar mayúsculas/minúsculas); en números/fechas usa
+                # coincidencia exacta cuando el término puede convertirse con seguridad.
                 clean = re.sub(r"[(),]", " ", q.strip())[:120]
-                if text_cols and clean:
-                    or_filter = ",".join(f"{c}.ilike.%{clean}%" for c in text_cols)
-                    query = query.or_(or_filter)
+                clauses = []
+
+                # Primero campos de negocio comunes para asegurar que siempre entren
+                # aunque la tabla tenga muchísimas columnas. Después agregamos el resto.
+                preferred = [
+                    "folio", "marca", "linea", "modelo", "anio", "año",
+                    "numero_serie", "serie", "vin", "numero_motor", "motor",
+                    "color", "contribuyente", "nombre", "nombre_completo",
+                    "titular", "entidad", "estado", "username", "user_id",
+                ]
+                by_name = {c["name"]: c for c in meta["columns"]}
+                ordered = []
+                seen = set()
+                for name in preferred:
+                    if name in by_name and name not in seen:
+                        ordered.append(by_name[name]); seen.add(name)
+                for c in meta["columns"]:
+                    if c["name"] not in seen:
+                        ordered.append(c); seen.add(c["name"])
+
+                for c in ordered[:40]:
+                    name = c["name"]
+                    typ = str(c.get("type") or "string").lower()
+                    fmt = str(c.get("format") or "").lower()
+
+                    if name in {"created_at", "updated_at"} and len(ordered) > 40:
+                        continue
+
+                    if typ == "string":
+                        clauses.append(f"{name}.ilike.%{clean}%")
+                        continue
+
+                    if typ in {"integer", "number"}:
+                        try:
+                            if typ == "integer":
+                                int(clean)
+                            else:
+                                float(clean)
+                            clauses.append(f"{name}.eq.{clean}")
+                        except ValueError:
+                            pass
+                        continue
+
+                    # Fechas/horas: solo comparación exacta cuando parece ISO para
+                    # evitar errores de conversión de Postgres.
+                    if fmt in {"date", "date-time"} and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ].*)?", clean):
+                        clauses.append(f"{name}.eq.{clean}")
+
+                if clauses:
+                    query = query.or_(",".join(clauses))
 
             if meta.get("has_expiration") and vigencia in {"vigentes", "vencidos"}:
                 hoy = datetime.now(ZoneInfo(timezone)).date().isoformat()
@@ -380,7 +426,7 @@ main{padding:22px;min-width:0}.card{background:#fff;border-radius:16px;box-shado
 <section class="card" id="card">
 <div class="top">
 <div class="heading"><div><h2 id="title">Selecciona una tabla</h2><div class="small" id="metaText">Cargando esquema...</div></div><div><button class="btn light" id="refreshBtn">↻ Actualizar</button> <button class="btn gold" id="addBtn" disabled>＋ Agregar registro</button></div></div>
-<div class="toolbar"><input id="q" placeholder="Buscar en columnas de texto..."><input id="entity" placeholder="Entidad / estado"><input id="status" placeholder="Estado del registro"><select id="limit"><option>25</option><option selected>50</option><option>100</option><option>200</option></select><button class="btn primary" id="searchBtn">Buscar</button><button class="btn light" id="clearBtn">Limpiar</button></div>
+<div class="toolbar"><input id="q" placeholder="Búsqueda universal: marca, línea, año, serie, motor, color, nombre, folio..."><input id="entity" placeholder="Entidad / estado"><input id="status" placeholder="Estado del registro"><select id="limit"><option>25</option><option selected>50</option><option>100</option><option>200</option></select><button class="btn primary" id="searchBtn">Buscar</button><button class="btn light" id="clearBtn">Limpiar</button></div>
 <div class="filters" id="vigFilters"><button class="chip active" data-v="todos">Todos</button><button class="chip" data-v="vigentes">Vigentes</button><button class="chip" data-v="vencidos">Vencidos</button></div>
 </div>
 <div class="bulk" id="bulk"><b id="selectedText">0 seleccionados</b><button class="btn danger" id="deleteBtn">Eliminar seleccionados</button><button class="btn light" id="unselectBtn">Quitar selección</button></div>
@@ -409,6 +455,6 @@ async function editCell(td){if(td.querySelector('input'))return;const i=+td.data
 function buildModal(){const cols=S.meta?.columns||[];$('#formGrid').innerHTML=cols.map(c=>{const skip=c.readOnly||c.default!==undefined||c.primary;const type=c.type==='boolean'?'checkbox':(c.type==='integer'||c.type==='number'?'number':(c.format==='date'?'date':(c.format==='date-time'?'datetime-local':'text')));return `<div class="field" ${skip?'data-optional="1"':''}><label>${esc(c.name)}${c.required&&!skip?' *':''}${skip?' (opcional/auto)':''}</label>${c.type==='object'||c.type==='array'?`<textarea data-col="${esc(c.name)}" data-type="${esc(c.type)}" placeholder="JSON"></textarea>`:`<input data-col="${esc(c.name)}" data-type="${esc(c.type)}" type="${type}" ${type==='checkbox'?'data-check="1"':''}>`}</div>`}).join('');$('#modalBg').classList.add('show')}
 async function saveNew(){const row={};document.querySelectorAll('#formGrid [data-col]').forEach(el=>{let v=el.dataset.check?el.checked:el.value;if(v===''&&!el.dataset.check)return;const t=el.dataset.type;if(t==='integer')v=parseInt(v,10);else if(t==='number')v=parseFloat(v);else if(t==='boolean')v=!!v;else if(t==='object'||t==='array')v=JSON.parse(v);row[el.dataset.col]=v});try{await api('/admin/api/db/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table:S.table,row})});$('#modalBg').classList.remove('show');loadRows()}catch(e){err(e.message)}}
 $('#deleteBtn').onclick=async()=>{const n=S.selected.size;if(!n)return;if(!confirm(`¿Eliminar definitivamente ${n} registro(s) de ${S.table}?\n\nEsta acción no se puede deshacer.`))return;if(n>=20&&!confirm(`Confirmación final: vas a borrar ${n} registros de ${S.table}. ¿Continuar?`))return;try{const d=await api('/admin/api/db/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table:S.table,keys:[...S.selected.values()]})});if(d.errors?.length)err('Se eliminaron '+d.deleted+'; algunos fallaron: '+d.errors[0]);loadRows()}catch(e){err(e.message)}};
-$('#unselectBtn').onclick=()=>{S.selected.clear();document.querySelectorAll('.rowChk').forEach(x=>x.checked=false);updateBulk()};$('#refreshBtn').onclick=()=>{loadSchema(1);if(S.table)loadRows()};$('#addBtn').onclick=buildModal;$('#cancelModal').onclick=()=>$('#modalBg').classList.remove('show');$('#saveNew').onclick=saveNew;$('#searchBtn').onclick=()=>{S.page=1;loadRows()};$('#clearBtn').onclick=()=>{$('#q').value='';$('#entity').value='';$('#status').value='';S.vigencia='todos';document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x.dataset.v==='todos'));S.page=1;loadRows()};$('#q').onkeydown=e=>{if(e.key==='Enter'){S.page=1;loadRows()}};$('#prevBtn').onclick=()=>{if(S.page>1){S.page--;loadRows()}};$('#nextBtn').onclick=()=>{if(S.page<S.pages){S.page++;loadRows()}};$('#limit').onchange=()=>{S.page=1;loadRows()};$('#tableSearch').oninput=renderTables;document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{S.vigencia=c.dataset.v;document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x===c));S.page=1;loadRows()});
+$('#unselectBtn').onclick=()=>{S.selected.clear();document.querySelectorAll('.rowChk').forEach(x=>x.checked=false);updateBulk()};$('#refreshBtn').onclick=()=>{loadSchema(1);if(S.table)loadRows()};$('#addBtn').onclick=buildModal;$('#cancelModal').onclick=()=>$('#modalBg').classList.remove('show');$('#saveNew').onclick=saveNew;$('#searchBtn').onclick=()=>{S.page=1;loadRows()};$('#clearBtn').onclick=()=>{$('#q').value='';$('#entity').value='';$('#status').value='';S.vigencia='todos';document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x.dataset.v==='todos'));S.page=1;loadRows()};let searchTimer=null;$('#q').onkeydown=e=>{if(e.key==='Enter'){clearTimeout(searchTimer);S.page=1;loadRows()}};$('#q').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{S.page=1;loadRows()},450)};$('#prevBtn').onclick=()=>{if(S.page>1){S.page--;loadRows()}};$('#nextBtn').onclick=()=>{if(S.page<S.pages){S.page++;loadRows()}};$('#limit').onchange=()=>{S.page=1;loadRows()};$('#tableSearch').oninput=renderTables;document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{S.vigencia=c.dataset.v;document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x===c));S.page=1;loadRows()});
 loadSchema();
 </script></body></html>'''.replace("__USERNAME__", username)
