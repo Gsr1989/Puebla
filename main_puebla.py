@@ -610,7 +610,8 @@ async def fallback(message: types.Message):
     await message.answer("Use /permiso o /start")
 
 # ==================== FASTAPI ====================
-async def lifespan(app: FastAPI):
+
+    async def lifespan(app: FastAPI):
     await asyncio.to_thread(_inicializar_folio)
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(f"{BASE_URL}/webhook", allowed_updates=["message", "callback_query"])
@@ -619,6 +620,15 @@ async def lifespan(app: FastAPI):
     await bot.session.close()
 
 app = FastAPI(lifespan=lifespan)
+
+app.include_router(
+    crear_router_admin_tablas(
+        supabase_admin=supabase_admin,
+        supabase_url=SUPABASE_URL,
+        service_key=SUPABASE_SERVICE_KEY,
+        timezone=TZ,
+    )
+)
 
 app.add_middleware(
     SessionMiddleware,
