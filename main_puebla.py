@@ -760,20 +760,27 @@ app.add_middleware(
 # ============================================================
 
 @app.post("/webhook")
-async def webhook(
-    request: Request
-):
-
+async def webhook(request: Request):
     data = await request.json()
 
-    await dp.feed_webhook_update(
-        bot,
-        types.Update(**data)
-    )
+    print("🔥 TELEGRAM UPDATE:", data)
 
-    return {
-        "ok": True
-    }
+    try:
+        update = types.Update(**data)
+
+        resultado = await dp.feed_webhook_update(
+            bot,
+            update
+        )
+
+        print("✅ AIOGRAM PROCESÓ UPDATE")
+        print("RESULTADO:", resultado)
+
+    except Exception as e:
+        print("❌ ERROR PROCESANDO TELEGRAM:", repr(e))
+        raise
+
+    return {"ok": True}
 
 # ==================== LOGIN ADMIN ====================
 
