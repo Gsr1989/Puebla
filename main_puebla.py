@@ -609,17 +609,102 @@ async def callback_validar(callback: types.CallbackQuery):
 async def fallback(message: types.Message):
     await message.answer("Use /permiso o /start")
 
+# ==================== CONFIG ====================
+
+BOT_TOKEN = os.getenv("BOT_TOKEN_PUEBLA", "")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
+# Conexión normal / pública
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
+
+# Conexión administrativa
+supabase_admin = create_client(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_KEY
+)
+
+BASE_URL = "https://smt-puebla-gob-mx.onrender.com"
+
+OUTPUT_DIR = "documentos"
+PLANTILLA = "PUEBLA_PLANTILLA_COMPLETA.pdf"
+
+ENTIDAD = "puebla"
+PRECIO = 180
+
+TZ = "America/Mexico_City"
+
+ADMIN_USER = os.getenv("ADMIN_USER", "")
+ADMIN_PASS = os.getenv("ADMIN_PASS", "")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+
+if not ADMIN_USER or not ADMIN_PASS:
+    print("[WARN] ADMIN_USER / ADMIN_PASS no configurados")
+
+if not SECRET_KEY:
+    print("[WARN] SECRET_KEY no configurada; usando temporal")
+    SECRET_KEY = os.urandom(32).hex()
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+bot = Bot(token=BOT_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
+
+
+# ============================================================
+# AQUÍ SIGUE TODO TU CÓDIGO NORMAL:
+# timers
+# generación de folios
+# PDFs
+# FSM
+# handlers del bot
+# etc.
+# ============================================================
+
+
 # ==================== FASTAPI ====================
 
-    async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):
+
     await asyncio.to_thread(_inicializar_folio)
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(f"{BASE_URL}/webhook", allowed_updates=["message", "callback_query"])
-    print(f"✅ Bot Puebla iniciado")
+
+    await bot.delete_webhook(
+        drop_pending_updates=True
+    )
+
+    await bot.set_webhook(
+        f"{BASE_URL}/webhook",
+        allowed_updates=[
+            "message",
+            "callback_query"
+        ]
+    )
+
+    print("✅ Bot Puebla iniciado")
+
     yield
+
     await bot.session.close()
 
-app = FastAPI(lifespan=lifespan)
+
+# ============================================================
+# CREAR APLICACIÓN FASTAPI
+# ============================================================
+
+app = FastAPI(
+    lifespan=lifespan
+)
+
+
+# ============================================================
+# ADMINISTRADOR GENERAL DE SUPABASE
+# ============================================================
 
 app.include_router(
     crear_router_admin_tablas(
@@ -630,6 +715,37 @@ app.include_router(
     )
 )
 
+
+# ============================================================
+# DEBUG TEMPORAL
+# Puedes quitar esto después de comprobar que funciona.
+# ============================================================
+
+print("====================================")
+print("ADMIN TABLAS CARGADO")
+print("====================================")
+
+for ruta in app.routes:
+
+    path = getattr(
+        ruta,
+        "path",
+        ""
+    )
+
+    if "/admin" in path:
+        print(
+            "RUTA ADMIN:",
+            path
+        )
+
+print("====================================")
+
+
+# ============================================================
+# SESIONES
+# ============================================================
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
@@ -638,11 +754,26 @@ app.add_middleware(
     max_age=1800
 )
 
+
+# ============================================================
+# WEBHOOK TELEGRAM
+# ============================================================
+
 @app.post("/webhook")
-async def webhook(request: Request):
+async def webhook(
+    request: Request
+):
+
     data = await request.json()
-    await dp.feed_webhook_update(bot, types.Update(**data))
-    return {"ok": True}
+
+    await dp.feed_webhook_update(
+        bot,
+        types.Update(**data)
+    )
+
+    return {
+        "ok": True
+    }
 
 # ==================== LOGIN ADMIN ====================
 
