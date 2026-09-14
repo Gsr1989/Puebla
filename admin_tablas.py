@@ -233,13 +233,35 @@ def crear_router_admin_tablas(
                     typ = str(c.get("type") or "string").lower()
                     fmt = str(c.get("format") or "").lower()
 
-                    if name in {"created_at", "updated_at"} and len(ordered) > 40:
+                    # IMPORTANTE: en OpenAPI/PostgREST los timestamp/date/uuid suelen
+                    # venir como type=string + format=..., pero PostgreSQL NO permite
+                    # ILIKE directamente sobre timestamp/uuid. Si cualquiera de esas
+                    # columnas entra al OR con ILIKE, toda la búsqueda falla con 400.
+                    temporal_formats = {
+                        "date", "date-time", "datetime", "time",
+                        "timestamp", "timestamp with time zone",
+                        "timestamp without time zone", "timestamptz",
+                    }
+
+                    if fmt in temporal_formats:
+                        # Solo permitimos igualdad cuando el usuario realmente escribe
+                        # una fecha ISO; una VIN/folio nunca se compara contra timestamps.
+                        if re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ].*)?", clean):
+                            clauses.append(f"{name}.eq.{clean}")
                         continue
 
+                    if fmt in {"uuid"}:
+                        # UUID tampoco soporta ILIKE. Solo comparación exacta si parece UUID.
+                        if re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}", clean):
+                            clauses.append(f"{name}.eq.{clean}")
+                        continue
+
+                    # Texto real: marca, línea, serie/VIN, motor, color, nombre, folio, etc.
                     if typ == "string":
                         clauses.append(f"{name}.ilike.%{clean}%")
                         continue
 
+                    # Números: igualdad solamente cuando el término es numérico.
                     if typ in {"integer", "number"}:
                         try:
                             if typ == "integer":
@@ -251,10 +273,8 @@ def crear_router_admin_tablas(
                             pass
                         continue
 
-                    # Fechas/horas: solo comparación exacta cuando parece ISO para
-                    # evitar errores de conversión de Postgres.
-                    if fmt in {"date", "date-time"} and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ].*)?", clean):
-                        clauses.append(f"{name}.eq.{clean}")
+                    # boolean, object, array, json, etc.: se omiten del buscador global
+                    # para que una columna incompatible nunca tumbe toda la consulta.
 
                 if clauses:
                     query = query.or_(",".join(clauses))
