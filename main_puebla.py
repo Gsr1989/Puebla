@@ -2516,14 +2516,65 @@ async def root(request: Request):
  
 @app.get("/estado_folio/{folio}", response_class=HTMLResponse)
 async def estado_folio_qr(folio: str):
+
     folio = folio.strip().upper()
 
+    # ==========================================================
+    # ESCAPAR DATOS
+    # ==========================================================
+
     def esc(valor):
-        return html_lib.escape(str(valor if valor is not None else "—"))
+        return html_lib.escape(
+            str(
+                valor
+                if valor is not None
+                else "—"
+            )
+        )
+
+    # ==========================================================
+    # PARSEAR FECHAS DE FORMA SEGURA
+    # ==========================================================
+
+    def parse_fecha(valor):
+
+        if not valor:
+            return None
+
+        texto = str(valor).strip()
+
+        try:
+
+            return datetime.fromisoformat(
+                texto.replace(
+                    "Z",
+                    "+00:00"
+                )
+            ).date()
+
+        except Exception:
+
+            try:
+
+                return datetime.strptime(
+                    texto[:10],
+                    "%Y-%m-%d"
+                ).date()
+
+            except Exception:
+
+                return None
+
 
     try:
+
+        # ======================================================
+        # CONSULTAR SUPABASE
+        # ======================================================
+
         res = (
-            supabase.table("folios_registrados")
+            supabase
+            .table("folios_registrados")
             .select("*")
             .eq("folio", folio)
             .eq("entidad", ENTIDAD)
@@ -2531,1239 +2582,2276 @@ async def estado_folio_qr(folio: str):
             .execute()
         )
 
-        # ==========================================================
+
+        # ======================================================
         # FOLIO NO ENCONTRADO
-        # ==========================================================
+        # ======================================================
+
         if not res.data:
+
             estado_html = f"""
-            <div class="resultado-box">
-                <div class="estado no-encontrado">
-                    <div class="estado-icono">✕</div>
-                    <div>
-                        <strong>FOLIO NO ENCONTRADO</strong>
-                        <span>El folio {esc(folio)} no se encuentra registrado.</span>
+            <section class="qr-card">
+
+                <div class="status status-error">
+
+                    <div class="status-icon">
+                        ×
                     </div>
+
+                    <div class="status-content">
+
+                        <div class="status-title">
+                            FOLIO NO ENCONTRADO
+                        </div>
+
+                        <div class="status-description">
+                            El folio
+                            <strong>{esc(folio)}</strong>
+                            no se encuentra registrado.
+                        </div>
+
+                    </div>
+
                 </div>
-            </div>
+
+
+                <div class="folio-display">
+
+                    <span>
+                        FOLIO CONSULTADO
+                    </span>
+
+                    <strong>
+                        {esc(folio)}
+                    </strong>
+
+                </div>
+
+
+                <div class="notice-box">
+
+                    Verifica que el número de folio
+                    haya sido capturado correctamente.
+
+                </div>
+
+            </section>
             """
+
+
+        # ======================================================
+        # FOLIO ENCONTRADO
+        # ======================================================
 
         else:
+
             r = res.data[0]
 
-            tz = ZoneInfo(TZ)
-            hoy = datetime.now(tz).date()
-
-            fecha_exp = datetime.fromisoformat(
-                str(r["fecha_expedicion"]).replace("Z", "+00:00")
+            hoy = datetime.now(
+                ZoneInfo(TZ)
             ).date()
 
-            fecha_ven = datetime.fromisoformat(
-                str(r["fecha_vencimiento"]).replace("Z", "+00:00")
-            ).date()
 
-            vigente = hoy <= fecha_ven
+            fecha_exp = parse_fecha(
+                r.get(
+                    "fecha_expedicion"
+                )
+            )
+
+            fecha_ven = parse_fecha(
+                r.get(
+                    "fecha_vencimiento"
+                )
+            )
+
+
+            vigente = (
+                fecha_ven is not None
+                and
+                hoy <= fecha_ven
+            )
+
+
+            # ==================================================
+            # ESTADO
+            # ==================================================
 
             if vigente:
-                estado_clase = "vigente"
+
+                estado_clase = (
+                    "status-ok"
+                )
+
                 estado_icono = "✓"
-                estado_titulo = "PERMISO VIGENTE"
-                estado_subtitulo = "El permiso se encuentra dentro de su periodo de vigencia."
+
+                estado_titulo = (
+                    "PERMISO VIGENTE"
+                )
+
+                estado_subtitulo = (
+                    "El permiso se encuentra "
+                    "dentro de su periodo de vigencia."
+                )
+
             else:
-                estado_clase = "vencido"
+
+                estado_clase = (
+                    "status-warning"
+                )
+
                 estado_icono = "!"
-                estado_titulo = "PERMISO VENCIDO"
-                estado_subtitulo = "El periodo de vigencia de este permiso ha concluido."
+
+                estado_titulo = (
+                    "PERMISO VENCIDO"
+                )
+
+                estado_subtitulo = (
+                    "El periodo de vigencia "
+                    "de este permiso ha concluido."
+                )
+
+
+            # ==================================================
+            # FECHAS
+            # ==================================================
+
+            fecha_exp_texto = (
+                fecha_exp.strftime(
+                    "%d/%m/%Y"
+                )
+                if fecha_exp
+                else "—"
+            )
+
+            fecha_ven_texto = (
+                fecha_ven.strftime(
+                    "%d/%m/%Y"
+                )
+                if fecha_ven
+                else "—"
+            )
+
+
+            # ==================================================
+            # HTML DEL RESULTADO
+            # ==================================================
 
             estado_html = f"""
-            <div class="resultado-box">
+            <section class="qr-card">
 
-                <div class="estado {estado_clase}">
-                    <div class="estado-icono">{estado_icono}</div>
-                    <div>
-                        <strong>{estado_titulo}</strong>
-                        <span>{estado_subtitulo}</span>
-                    </div>
-                </div>
+                <div class="status {estado_clase}">
 
-                <div class="folio-principal">
-                    <div class="folio-label">FOLIO</div>
-                    <div class="folio-numero">{esc(folio)}</div>
-                </div>
-
-                <div class="separador"></div>
-
-                <h2 class="titulo-seccion">
-                    Información del permiso
-                </h2>
-
-                <div class="datos-grid">
-
-                    <div class="dato">
-                        <div class="dato-label">Folio</div>
-                        <div class="dato-valor">{esc(folio)}</div>
+                    <div class="status-icon">
+                        {estado_icono}
                     </div>
 
-                    <div class="dato">
-                        <div class="dato-label">Contribuyente</div>
-                        <div class="dato-valor">
-                            {esc(r.get("contribuyente", "—"))}
-                        </div>
-                    </div>
+                    <div class="status-content">
 
-                    <div class="dato">
-                        <div class="dato-label">Marca</div>
-                        <div class="dato-valor">
-                            {esc(r.get("marca", "—"))}
+                        <div class="status-title">
+                            {estado_titulo}
                         </div>
-                    </div>
 
-                    <div class="dato">
-                        <div class="dato-label">Línea / Modelo</div>
-                        <div class="dato-valor">
-                            {esc(r.get("linea", "—"))}
+                        <div class="status-description">
+                            {estado_subtitulo}
                         </div>
-                    </div>
 
-                    <div class="dato">
-                        <div class="dato-label">Año</div>
-                        <div class="dato-valor">
-                            {esc(r.get("anio", "—"))}
-                        </div>
-                    </div>
-
-                    <div class="dato">
-                        <div class="dato-label">Color</div>
-                        <div class="dato-valor">
-                            {esc(r.get("color", "—"))}
-                        </div>
-                    </div>
-
-                    <div class="dato dato-ancho">
-                        <div class="dato-label">
-                            Número de Identificación Vehicular / Serie
-                        </div>
-                        <div class="dato-valor mono">
-                            {esc(r.get("numero_serie", "—"))}
-                        </div>
-                    </div>
-
-                    <div class="dato dato-ancho">
-                        <div class="dato-label">
-                            Número de motor
-                        </div>
-                        <div class="dato-valor mono">
-                            {esc(r.get("numero_motor", "—"))}
-                        </div>
-                    </div>
-
-                    <div class="dato">
-                        <div class="dato-label">Fecha de expedición</div>
-                        <div class="dato-valor">
-                            {fecha_exp.strftime("%d/%m/%Y")}
-                        </div>
-                    </div>
-
-                    <div class="dato">
-                        <div class="dato-label">Fecha de vencimiento</div>
-                        <div class="dato-valor">
-                            {fecha_ven.strftime("%d/%m/%Y")}
-                        </div>
                     </div>
 
                 </div>
 
-                <div class="vigencia-nota">
-                    <strong>Estado de vigencia:</strong>
-                    La información presentada corresponde al registro
-                    asociado al folio consultado.
+
+                <div class="folio-display">
+
+                    <span>
+                        FOLIO
+                    </span>
+
+                    <strong>
+                        {esc(folio)}
+                    </strong>
+
                 </div>
 
-            </div>
+
+                <div class="gold-divider"></div>
+
+
+                <div class="section-heading">
+
+                    <h2>
+                        Información del permiso
+                    </h2>
+
+                    <p>
+                        Datos asociados al folio consultado
+                    </p>
+
+                </div>
+
+
+                <div class="data-grid">
+
+
+                    <div class="data-item">
+
+                        <span>
+                            FOLIO
+                        </span>
+
+                        <strong>
+                            {esc(folio)}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            CONTRIBUYENTE
+                        </span>
+
+                        <strong>
+                            {
+                                esc(
+                                    r.get(
+                                        "contribuyente",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            MARCA
+                        </span>
+
+                        <strong>
+                            {
+                                esc(
+                                    r.get(
+                                        "marca",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            LÍNEA / MODELO
+                        </span>
+
+                        <strong>
+                            {
+                                esc(
+                                    r.get(
+                                        "linea",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            AÑO
+                        </span>
+
+                        <strong>
+                            {
+                                esc(
+                                    r.get(
+                                        "anio",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            COLOR
+                        </span>
+
+                        <strong>
+                            {
+                                esc(
+                                    r.get(
+                                        "color",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item data-wide">
+
+                        <span>
+                            NÚMERO DE IDENTIFICACIÓN VEHICULAR / SERIE
+                        </span>
+
+                        <strong class="code-value">
+                            {
+                                esc(
+                                    r.get(
+                                        "numero_serie",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item data-wide">
+
+                        <span>
+                            NÚMERO DE MOTOR
+                        </span>
+
+                        <strong class="code-value">
+                            {
+                                esc(
+                                    r.get(
+                                        "numero_motor",
+                                        "—"
+                                    )
+                                )
+                            }
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            FECHA DE EXPEDICIÓN
+                        </span>
+
+                        <strong>
+                            {fecha_exp_texto}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="data-item">
+
+                        <span>
+                            FECHA DE VENCIMIENTO
+                        </span>
+
+                        <strong>
+                            {fecha_ven_texto}
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="notice-box">
+
+                    <strong>
+                        Estado de vigencia:
+                    </strong>
+
+                    la información presentada corresponde
+                    al registro asociado al folio consultado.
+
+                </div>
+
+            </section>
             """
 
-        # ==========================================================
-        # HTML COMPLETO
-        # ==========================================================
-        year = datetime.now(ZoneInfo(TZ)).year
 
-        pagina = f"""<!DOCTYPE html>
+        # ======================================================
+        # AÑO
+        # ======================================================
+
+        year = datetime.now(
+            ZoneInfo(TZ)
+        ).year
+
+
+        # ======================================================
+        # HTML COMPLETO
+        # ======================================================
+
+        pagina = f"""
+<!DOCTYPE html>
+
 <html lang="es">
 
 <head>
 
-    <meta charset="utf-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-
-    <meta
-        name="description"
-        content="Consulta de permiso vehicular"
-    >
-
-    <title>
-        Secretaría de Movilidad y Transporte - Consulta
-    </title>
-
-    <link
-        rel="icon"
-        href="https://smt.puebla.gob.mx/templates/puebla/favicon.ico"
-        type="image/vnd.microsoft.icon"
-    >
-
-    <style>
-
-        :root {{
-            --vino: #5f1b2d;
-            --vino-oscuro: #48101e;
-            --dorado: #c09761;
-            --dorado-claro: #c79b66;
-            --gris: #949494;
-            --gris2: #b2b2b2;
-            --gris-claro: #f6f6f6;
-            --azul: #001B4C;
-            --blanco: #ffffff;
-        }}
-
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-
-        html {{
-            min-height: 100%;
-            background: #f4f4f4;
-        }}
-
-        body {{
-            margin: 0;
-            min-height: 100vh;
-            background: #f4f4f4;
-            color: #555;
-            font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-        }}
-
-        img {{
-            max-width: 100%;
-            height: auto;
-        }}
-
-        /* =====================================================
-           HEADER
-           ===================================================== */
-
-        .header {{
-            background: #fff;
-            position: relative;
-            z-index: 10;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }}
-
-        .header-inner {{
-            max-width: 1380px;
-            margin: 0 auto;
-            padding: 18px 30px;
-
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 30px;
-        }}
-
-        .logos {{
-            display: flex;
-            align-items: center;
-            gap: 22px;
-            min-width: 0;
-        }}
-
-        .logo-gob {{
-            width: 245px;
-            max-height: 82px;
-            object-fit: contain;
-        }}
-
-        .logo-secretaria {{
-            width: 225px;
-            max-height: 88px;
-            object-fit: contain;
-        }}
-
-        .frase-header {{
-            width: 300px;
-            max-height: 90px;
-            object-fit: contain;
-        }}
-
-        /* =====================================================
-           MENU
-           ===================================================== */
-
-        .menu {{
-            background: var(--vino);
-        }}
-
-        .menu-inner {{
-            max-width: 1380px;
-            margin: auto;
-            min-height: 52px;
-            padding: 0 30px;
-
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 12px;
-        }}
-
-        .menu a {{
-            color: white;
-            text-decoration: none;
-            font-size: 15px;
-            padding: 17px 19px;
-            transition: background .2s ease;
-        }}
-
-        .menu a:hover {{
-            background: rgba(255,255,255,0.1);
-        }}
-
-        /* =====================================================
-           HERO
-           ===================================================== */
-
-        .hero {{
-            position: relative;
-            overflow: hidden;
-            background:
-                linear-gradient(
-                    120deg,
-                    #f8f8f8 0%,
-                    #f4f4f4 65%,
-                    #eee 100%
-                );
-
-            border-bottom: 1px solid #e4e4e4;
-
-            padding:
-                50px 20px
-                90px;
-        }}
-
-        .hero::after {{
-            content: "";
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 7px;
-            background: var(--dorado);
-        }}
-
-        .hero-inner {{
-            max-width: 1050px;
-            margin: auto;
-            text-align: center;
-        }}
-
-        .hero h1 {{
-            color: var(--vino);
-            font-size: 34px;
-            font-weight: 400;
-            margin-bottom: 9px;
-        }}
-
-        .hero p {{
-            color: var(--gris);
-            font-size: 17px;
-        }}
-
-        /* =====================================================
-           RESULTADO
-           ===================================================== */
-
-        .contenido {{
-            padding:
-                0 20px
-                60px;
-        }}
-
-        .resultado-box {{
-            position: relative;
-            z-index: 2;
-
-            width: 100%;
-            max-width: 1000px;
-
-            margin:
-                -55px auto
-                40px;
-
-            background: white;
-
-            border-radius: 24px;
-
-            padding:
-                38px 40px
-                42px;
-
-            box-shadow:
-                0 8px 32px
-                rgba(0,0,0,0.11);
-        }}
-
-        .estado {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-
-            border-radius: 14px;
-
-            padding: 18px 25px;
-
-            margin-bottom: 30px;
-        }}
-
-        .estado-icono {{
-            width: 46px;
-            height: 46px;
-            flex: 0 0 46px;
-
-            border-radius: 50%;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            font-size: 25px;
-            font-weight: bold;
-        }}
-
-        .estado strong {{
-            display: block;
-            font-size: 17px;
-            margin-bottom: 3px;
-        }}
-
-        .estado span {{
-            display: block;
-            font-size: 14px;
-            font-weight: normal;
-        }}
-
-        .vigente {{
-            color: #155724;
-            background: #e6f4e8;
-            border: 1px solid #b9dfbf;
-        }}
-
-        .vigente .estado-icono {{
-            color: white;
-            background: #38934d;
-        }}
-
-        .vencido {{
-            color: #856404;
-            background: #fff7dc;
-            border: 1px solid #f0d98a;
-        }}
-
-        .vencido .estado-icono {{
-            color: white;
-            background: #d59e16;
-        }}
-
-        .no-encontrado {{
-            color: #721c24;
-            background: #f8d7da;
-            border: 1px solid #e7abb1;
-        }}
-
-        .no-encontrado .estado-icono {{
-            color: white;
-            background: #b72f3c;
-        }}
-
-        .folio-principal {{
-            text-align: center;
-            margin:
-                10px 0
-                27px;
-        }}
-
-        .folio-label {{
-            color: var(--gris);
-            font-size: 12px;
-            font-weight: bold;
-            letter-spacing: 3px;
-            margin-bottom: 7px;
-        }}
-
-        .folio-numero {{
-            color: var(--vino);
-            font-size: 30px;
-            font-weight: 600;
-            letter-spacing: 1px;
-        }}
-
-        .separador {{
-            width: 100%;
-            height: 1px;
-            background: #e9e9e9;
-            margin: 0 0 28px;
-        }}
-
-        .titulo-seccion {{
-            color: var(--vino);
-            font-size: 22px;
-            font-weight: 400;
-            margin-bottom: 22px;
-        }}
-
-        .datos-grid {{
-            display: grid;
-
-            grid-template-columns:
-                repeat(2, minmax(0, 1fr));
-
-            gap: 15px;
-        }}
-
-        .dato {{
-            background: var(--gris-claro);
-            border-radius: 12px;
-            padding: 16px 18px;
-
-            border-left:
-                4px solid
-                var(--dorado-claro);
-        }}
-
-        .dato-ancho {{
-            grid-column: auto;
-        }}
-
-        .dato-label {{
-            color: var(--gris);
-            font-size: 11px;
-            font-weight: bold;
-
-            text-transform: uppercase;
-
-            letter-spacing: .8px;
-
-            margin-bottom: 6px;
-        }}
-
-        .dato-valor {{
-            color: #484848;
-            font-size: 16px;
-            font-weight: 500;
-            line-height: 1.35;
-            overflow-wrap: anywhere;
-        }}
-
-        .mono {{
-            font-family:
-                "Courier New",
-                monospace;
-            letter-spacing: .3px;
-        }}
-
-        .vigencia-nota {{
-            background: #faf7f3;
-            border-left: 4px solid var(--dorado);
-            margin-top: 25px;
-
-            padding:
-                16px 18px;
-
-            color: #686868;
-            font-size: 13px;
-            line-height: 1.55;
-        }}
-
-        .vigencia-nota strong {{
-            color: var(--vino);
-        }}
-
-        /* =====================================================
-           CONTACTO
-           ===================================================== */
-
-        .contacto {{
-            max-width: 1180px;
-            margin: 35px auto;
-
-            background: white;
-
-            border-radius: 22px;
-
-            padding:
-                24px 30px;
-
-            box-shadow:
-                0 4px 18px
-                rgba(0,0,0,0.07);
-        }}
-
-        .contacto-grid {{
-            display: grid;
-
-            grid-template-columns:
-                1fr 1fr 1.4fr;
-
-            align-items: center;
-
-            gap: 30px;
-        }}
-
-        .contacto-item {{
-            color: var(--gris);
-            font-size: 14px;
-            line-height: 1.6;
-        }}
-
-        .contacto-item strong {{
-            display: block;
-            color: var(--vino);
-            margin-bottom: 4px;
-            font-size: 14px;
-        }}
-
-        /* =====================================================
-           TRANSPARENCIA
-           ===================================================== */
-
-        .transparencia {{
-            background: #e3e3e3;
-            padding: 35px 20px;
-        }}
-
-        .transparencia-inner {{
-            max-width: 1100px;
-            margin: auto;
-            text-align: center;
-        }}
-
-        .transparencia h2 {{
-            color: #aaa;
-            font-weight: 300;
-            letter-spacing: 3px;
-            margin-bottom: 18px;
-            font-size: 24px;
-        }}
-
-        .transparencia-links {{
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px 18px;
-        }}
-
-        .transparencia a {{
-            color: #8e8e8e;
-            font-size: 12px;
-            text-decoration: none;
-        }}
-
-        .transparencia a:hover {{
-            color: var(--vino);
-        }}
-
-        /* =====================================================
-           FOOTER
-           ===================================================== */
-
-        .footer {{
-            background: var(--vino);
-            color: #fff;
-            padding: 45px 25px;
-        }}
-
-        .footer-inner {{
-            max-width: 1150px;
-            margin: auto;
-
-            display: grid;
-
-            grid-template-columns:
-                1.1fr 1fr;
-
-            gap: 55px;
-
-            align-items: center;
-        }}
-
-        .footer-logo {{
-            max-width: 480px;
-        }}
-
-        .footer-links {{
-            list-style: none;
-        }}
-
-        .footer-links li {{
-            margin: 7px 0;
-        }}
-
-        .footer-links a {{
-            color: #fffbef;
-            text-decoration: none;
-            font-size: 14px;
-            line-height: 1.5;
-        }}
-
-        .footer-links a:hover {{
-            text-decoration: underline;
-        }}
-
-        .copyright {{
-            padding: 15px 20px;
-            background: var(--vino-oscuro);
-
-            color:
-                rgba(255,255,255,0.72);
-
-            text-align: center;
-
-            font-size: 12px;
-        }}
-
-        /* =====================================================
-           RESPONSIVE
-           ===================================================== */
-
-        @media (max-width: 900px) {{
-
-            .header-inner {{
-                padding:
-                    15px 20px;
-            }}
-
-            .logo-gob {{
-                width:
-                    190px;
-            }}
-
-            .logo-secretaria {{
-                width:
-                    175px;
-            }}
-
-            .frase-header {{
-                display:
-                    none;
-            }}
-
-            .contacto-grid {{
-                grid-template-columns:
-                    1fr;
-                text-align: center;
-            }}
-
-            .footer-inner {{
-                grid-template-columns:
-                    1fr;
-                text-align: center;
-            }}
-
-            .footer-logo {{
-                margin: auto;
-            }}
-        }}
-
-        @media (max-width: 650px) {{
-
-            .header-inner {{
-                display:
-                    block;
-            }}
-
-            .logos {{
-                justify-content:
-                    center;
-
-                gap:
-                    10px;
-            }}
-
-            .logo-gob {{
-                width:
-                    48%;
-            }}
-
-            .logo-secretaria {{
-                width:
-                    44%;
-            }}
-
-            .menu-inner {{
-                justify-content:
-                    center;
-
-                padding:
-                    0 10px;
-            }}
-
-            .menu a {{
-                font-size:
-                    13px;
-
-                padding:
-                    15px 10px;
-            }}
-
-            .hero {{
-                padding:
-                    38px 15px
-                    80px;
-            }}
-
-            .hero h1 {{
-                font-size:
-                    26px;
-            }}
-
-            .hero p {{
-                font-size:
-                    14px;
-            }}
-
-            .contenido {{
-                padding:
-                    0 12px
-                    40px;
-            }}
-
-            .resultado-box {{
-                margin:
-                    -45px auto
-                    30px;
-
-                padding:
-                    24px 16px
-                    28px;
-
-                border-radius:
-                    17px;
-            }}
-
-            .estado {{
-                justify-content:
-                    flex-start;
-
-                text-align:
-                    left;
-
-                padding:
-                    15px;
-            }}
-
-            .estado-icono {{
-                width:
-                    40px;
-
-                height:
-                    40px;
-
-                flex-basis:
-                    40px;
-
-                font-size:
-                    21px;
-            }}
-
-            .estado strong {{
-                font-size:
-                    14px;
-            }}
-
-            .estado span {{
-                font-size:
-                    12px;
-            }}
-
-            .folio-numero {{
-                font-size:
-                    23px;
-            }}
-
-            .titulo-seccion {{
-                font-size:
-                    19px;
-            }}
-
-            .datos-grid {{
-                grid-template-columns:
-                    1fr;
-            }}
-
-            .contacto {{
-                margin:
-                    25px 12px;
-
-                padding:
-                    22px;
-            }}
-
-            .footer {{
-                padding:
-                    35px 20px;
-            }}
-        }}
-
-    </style>
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+
+<meta
+    name="description"
+    content="Secretaría de Movilidad y Transporte - Consulta de permiso"
+>
+
+<title>
+    .: Secretaría de Movilidad y Transporte :.
+</title>
+
+
+<!-- =========================================================
+     FAVICON OFICIAL
+========================================================= -->
+
+<link
+    href="https://smt.puebla.gob.mx/templates/puebla/favicon.ico"
+    rel="icon"
+    type="image/vnd.microsoft.icon"
+>
+
+
+<!-- =========================================================
+     CSS OFICIAL PUEBLA
+========================================================= -->
+
+<link
+    href="https://smt.puebla.gob.mx/templates/puebla/uikit-3.23.5/css/uikit.min.css"
+    rel="stylesheet"
+>
+
+<link
+    href="https://smt.puebla.gob.mx/templates/puebla/css/template.css"
+    rel="stylesheet"
+>
+
+<link
+    href="https://smt.puebla.gob.mx/templates/puebla/css/puebla.css"
+    rel="stylesheet"
+>
+
+<link
+    href="https://smt.puebla.gob.mx/templates/puebla/css/nanoscroller.css"
+    rel="stylesheet"
+>
+
+<link
+    href="https://smt.puebla.gob.mx/templates/puebla/html/mod_menu/css/style.css"
+    rel="stylesheet"
+>
+
+
+<!-- =========================================================
+     UIKIT OFICIAL
+========================================================= -->
+
+<script
+    src="https://smt.puebla.gob.mx/templates/puebla/uikit-3.23.5/js/uikit.min.js"
+></script>
+
+<script
+    src="https://smt.puebla.gob.mx/templates/puebla/uikit-3.23.5/js/uikit-icons.min.js"
+></script>
+
+
+<style>
+
+:root {{
+
+    --vino:
+        #5f1b2d;
+
+    --vino-dark:
+        #48101e;
+
+    --dorado:
+        #c09761;
+
+    --dorado-claro:
+        #c79b66;
+
+    --gris:
+        #949494;
+
+    --gris2:
+        #b2b2b2;
+
+    --gris-fondo:
+        #f5f5f5;
+
+    --azul:
+        #001B4C;
+}}
+
+
+* {{
+    box-sizing:
+        border-box;
+}}
+
+
+html,
+body {{
+
+    margin:
+        0;
+
+    padding:
+        0;
+
+    width:
+        100%;
+
+    min-height:
+        100%;
+
+    background:
+        #f5f5f5;
+}}
+
+
+body {{
+
+    color:
+        #666;
+}}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.qr-header {{
+
+    background:
+        white;
+
+    box-shadow:
+        0 2px 8px
+        rgba(
+            0,
+            0,
+            0,
+            .08
+        );
+
+    position:
+        relative;
+
+    z-index:
+        20;
+}}
+
+
+.qr-header-inner {{
+
+    max-width:
+        1380px;
+
+    margin:
+        auto;
+
+    padding:
+        18px 30px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    gap:
+        25px;
+}}
+
+
+.qr-brand {{
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        25px;
+
+    min-width:
+        0;
+}}
+
+
+.logo-puebla {{
+
+    width:
+        245px;
+
+    max-height:
+        82px;
+
+    object-fit:
+        contain;
+}}
+
+
+.logo-smt {{
+
+    width:
+        225px;
+
+    max-height:
+        90px;
+
+    object-fit:
+        contain;
+}}
+
+
+.logo-frase {{
+
+    width:
+        300px;
+
+    max-height:
+        90px;
+
+    object-fit:
+        contain;
+}}
+
+
+/* =========================================================
+   MENÚ
+========================================================= */
+
+.qr-menu {{
+
+    background:
+        var(--vino);
+}}
+
+
+.qr-menu-inner {{
+
+    max-width:
+        1380px;
+
+    min-height:
+        53px;
+
+    margin:
+        auto;
+
+    padding:
+        0 30px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        flex-end;
+
+    gap:
+        3px;
+}}
+
+
+.qr-menu a {{
+
+    color:
+        white;
+
+    text-decoration:
+        none;
+
+    padding:
+        17px 20px;
+
+    font-size:
+        15px;
+}}
+
+
+.qr-menu a:hover {{
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .12
+        );
+
+    color:
+        white;
+}}
+
+
+/* =========================================================
+   HERO
+========================================================= */
+
+.qr-hero {{
+
+    position:
+        relative;
+
+    overflow:
+        hidden;
+
+    min-height:
+        215px;
+
+    padding:
+        48px 20px
+        92px;
+
+    background:
+
+        linear-gradient(
+            120deg,
+            #fbfbfb,
+            #eeeeee
+        );
+
+    text-align:
+        center;
+}}
+
+
+.qr-hero::after {{
+
+    content:
+        "";
+
+    position:
+        absolute;
+
+    bottom:
+        0;
+
+    left:
+        0;
+
+    width:
+        100%;
+
+    height:
+        8px;
+
+    background:
+        var(--dorado);
+}}
+
+
+.qr-hero h1 {{
+
+    color:
+        var(--vino);
+
+    font-size:
+        36px;
+
+    font-weight:
+        300;
+
+    margin:
+        0 0 8px;
+}}
+
+
+.qr-hero p {{
+
+    margin:
+        0;
+
+    color:
+        var(--gris);
+
+    font-size:
+        17px;
+}}
+
+
+/* =========================================================
+   CONTENIDO PRINCIPAL
+========================================================= */
+
+.qr-main {{
+
+    padding:
+        0 18px
+        70px;
+}}
+
+
+.qr-card {{
+
+    position:
+        relative;
+
+    z-index:
+        5;
+
+    width:
+        100%;
+
+    max-width:
+        1000px;
+
+    margin:
+        -58px auto 0;
+
+    padding:
+        40px;
+
+    background:
+        white;
+
+    border-radius:
+        25px;
+
+    box-shadow:
+        0 10px 35px
+        rgba(
+            0,
+            0,
+            0,
+            .12
+        );
+}}
+
+
+/* =========================================================
+   ESTADO
+========================================================= */
+
+.status {{
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        18px;
+
+    border-radius:
+        15px;
+
+    padding:
+        20px 23px;
+
+    margin-bottom:
+        32px;
+}}
+
+
+.status-icon {{
+
+    width:
+        50px;
+
+    height:
+        50px;
+
+    flex:
+        0 0 50px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    border-radius:
+        50%;
+
+    font-size:
+        28px;
+
+    font-weight:
+        bold;
+
+    color:
+        white;
+}}
+
+
+.status-title {{
+
+    font-size:
+        18px;
+
+    font-weight:
+        700;
+
+    margin-bottom:
+        3px;
+}}
+
+
+.status-description {{
+
+    font-size:
+        14px;
+
+    line-height:
+        1.45;
+}}
+
+
+.status-ok {{
+
+    background:
+        #e6f4e8;
+
+    border:
+        1px solid
+        #b9dfbf;
+
+    color:
+        #155724;
+}}
+
+
+.status-ok
+.status-icon {{
+
+    background:
+        #38934d;
+}}
+
+
+.status-warning {{
+
+    background:
+        #fff7dc;
+
+    border:
+        1px solid
+        #f0d98a;
+
+    color:
+        #856404;
+}}
+
+
+.status-warning
+.status-icon {{
+
+    background:
+        #d59e16;
+}}
+
+
+.status-error {{
+
+    background:
+        #f8d7da;
+
+    border:
+        1px solid
+        #e7abb1;
+
+    color:
+        #721c24;
+}}
+
+
+.status-error
+.status-icon {{
+
+    background:
+        #b72f3c;
+}}
+
+
+/* =========================================================
+   FOLIO
+========================================================= */
+
+.folio-display {{
+
+    text-align:
+        center;
+
+    padding:
+        7px 0 28px;
+}}
+
+
+.folio-display span {{
+
+    display:
+        block;
+
+    color:
+        var(--gris);
+
+    font-size:
+        12px;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        3px;
+
+    margin-bottom:
+        8px;
+}}
+
+
+.folio-display strong {{
+
+    display:
+        block;
+
+    color:
+        var(--vino);
+
+    font-size:
+        34px;
+
+    letter-spacing:
+        1px;
+
+    font-weight:
+        600;
+
+    overflow-wrap:
+        anywhere;
+}}
+
+
+.gold-divider {{
+
+    width:
+        100%;
+
+    height:
+        1px;
+
+    background:
+        #e8e8e8;
+
+    margin-bottom:
+        27px;
+}}
+
+
+/* =========================================================
+   TÍTULO SECCIÓN
+========================================================= */
+
+.section-heading {{
+
+    margin-bottom:
+        25px;
+}}
+
+
+.section-heading h2 {{
+
+    margin:
+        0;
+
+    color:
+        var(--vino);
+
+    font-size:
+        24px;
+
+    font-weight:
+        400;
+}}
+
+
+.section-heading p {{
+
+    margin:
+        5px 0 0;
+
+    color:
+        #9a9a9a;
+
+    font-size:
+        13px;
+}}
+
+
+/* =========================================================
+   DATOS
+========================================================= */
+
+.data-grid {{
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        15px;
+}}
+
+
+.data-item {{
+
+    min-width:
+        0;
+
+    padding:
+        17px 18px;
+
+    background:
+        #f7f7f7;
+
+    border-radius:
+        12px;
+
+    border-left:
+        4px solid
+        var(--dorado-claro);
+}}
+
+
+.data-item span {{
+
+    display:
+        block;
+
+    color:
+        #979797;
+
+    font-size:
+        11px;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        .7px;
+
+    margin-bottom:
+        7px;
+}}
+
+
+.data-item strong {{
+
+    display:
+        block;
+
+    color:
+        #4b4b4b;
+
+    font-size:
+        16px;
+
+    font-weight:
+        500;
+
+    line-height:
+        1.4;
+
+    overflow-wrap:
+        anywhere;
+}}
+
+
+.code-value {{
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    letter-spacing:
+        .3px;
+}}
+
+
+/* =========================================================
+   NOTA
+========================================================= */
+
+.notice-box {{
+
+    margin-top:
+        26px;
+
+    padding:
+        17px 19px;
+
+    background:
+        #faf7f3;
+
+    border-left:
+        4px solid
+        var(--dorado);
+
+    color:
+        #696969;
+
+    font-size:
+        13px;
+
+    line-height:
+        1.6;
+}}
+
+
+.notice-box strong {{
+
+    color:
+        var(--vino);
+}}
+
+
+/* =========================================================
+   CONTACTO
+========================================================= */
+
+.contact-strip {{
+
+    width:
+        calc(100% - 30px);
+
+    max-width:
+        1180px;
+
+    margin:
+        40px auto;
+
+    padding:
+        21px 25px;
+
+    background:
+        white;
+
+    border-radius:
+        20px;
+
+    box-shadow:
+        0 4px 16px
+        rgba(
+            0,
+            0,
+            0,
+            .07
+        );
+}}
+
+
+.contact-grid {{
+
+    display:
+        grid;
+
+    grid-template-columns:
+        1fr 1.3fr 1.4fr;
+
+    gap:
+        25px;
+
+    align-items:
+        center;
+}}
+
+
+.contact-item {{
+
+    color:
+        #858585;
+
+    font-size:
+        14px;
+
+    line-height:
+        1.55;
+}}
+
+
+.contact-item strong {{
+
+    display:
+        block;
+
+    color:
+        var(--dorado);
+
+    margin-bottom:
+        4px;
+}}
+
+
+/* =========================================================
+   REDES
+========================================================= */
+
+.social-section {{
+
+    background:
+        #e3e3e3;
+
+    padding:
+        35px 20px;
+}}
+
+
+.social-inner {{
+
+    max-width:
+        1100px;
+
+    margin:
+        auto;
+
+    text-align:
+        center;
+}}
+
+
+.social-title {{
+
+    color:
+        #949494;
+
+    font-size:
+        20px;
+
+    margin-bottom:
+        22px;
+}}
+
+
+.social-icons {{
+
+    display:
+        flex;
+
+    justify-content:
+        center;
+
+    align-items:
+        center;
+
+    flex-wrap:
+        wrap;
+
+    gap:
+        18px;
+}}
+
+
+.social-icons img {{
+
+    width:
+        48px;
+
+    height:
+        48px;
+}}
+
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.qr-footer {{
+
+    position:
+        relative;
+
+    background:
+        var(--vino);
+
+    color:
+        white;
+
+    padding:
+        50px 25px;
+}}
+
+
+.qr-footer-inner {{
+
+    max-width:
+        1150px;
+
+    margin:
+        auto;
+
+    display:
+        grid;
+
+    grid-template-columns:
+        1.15fr 1fr;
+
+    align-items:
+        center;
+
+    gap:
+        50px;
+}}
+
+
+.footer-logo {{
+
+    width:
+        520px;
+
+    max-width:
+        100%;
+}}
+
+
+.footer-links {{
+
+    list-style:
+        none;
+
+    margin:
+        0;
+
+    padding:
+        0;
+}}
+
+
+.footer-links li {{
+
+    margin:
+        8px 0;
+}}
+
+
+.footer-links a {{
+
+    color:
+        #fffbef;
+
+    text-decoration:
+        none;
+
+    font-size:
+        14px;
+
+    line-height:
+        1.6;
+}}
+
+
+.footer-links a:hover {{
+
+    color:
+        white;
+
+    text-decoration:
+        underline;
+}}
+
+
+.qr-copyright {{
+
+    background:
+        var(--vino-dark);
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .72
+        );
+
+    padding:
+        16px 20px;
+
+    text-align:
+        center;
+
+    font-size:
+        12px;
+}}
+
+
+/* =========================================================
+   MÓVIL
+========================================================= */
+
+@media
+(max-width: 800px) {{
+
+    .qr-header-inner {{
+
+        padding:
+            15px;
+    }}
+
+
+    .qr-brand {{
+
+        gap:
+            9px;
+
+        width:
+            100%;
+    }}
+
+
+    .logo-puebla {{
+
+        width:
+            51%;
+    }}
+
+
+    .logo-smt {{
+
+        width:
+            45%;
+    }}
+
+
+    .logo-frase {{
+
+        display:
+            none;
+    }}
+
+
+    .qr-menu-inner {{
+
+        justify-content:
+            center;
+
+        padding:
+            0 10px;
+    }}
+
+
+    .qr-menu a {{
+
+        padding:
+            15px 12px;
+
+        font-size:
+            13px;
+    }}
+
+
+    .qr-hero {{
+
+        padding:
+            38px 15px
+            80px;
+
+        min-height:
+            190px;
+    }}
+
+
+    .qr-hero h1 {{
+
+        font-size:
+            27px;
+    }}
+
+
+    .qr-hero p {{
+
+        font-size:
+            14px;
+    }}
+
+
+    .qr-main {{
+
+        padding:
+            0 12px
+            45px;
+    }}
+
+
+    .qr-card {{
+
+        margin-top:
+            -48px;
+
+        padding:
+            25px 17px
+            30px;
+
+        border-radius:
+            18px;
+    }}
+
+
+    .status {{
+
+        align-items:
+            flex-start;
+
+        padding:
+            16px;
+    }}
+
+
+    .status-icon {{
+
+        width:
+            42px;
+
+        height:
+            42px;
+
+        flex-basis:
+            42px;
+
+        font-size:
+            22px;
+    }}
+
+
+    .status-title {{
+
+        font-size:
+            15px;
+    }}
+
+
+    .status-description {{
+
+        font-size:
+            12px;
+    }}
+
+
+    .folio-display strong {{
+
+        font-size:
+            25px;
+    }}
+
+
+    .section-heading h2 {{
+
+        font-size:
+            20px;
+    }}
+
+
+    .data-grid {{
+
+        grid-template-columns:
+            1fr;
+    }}
+
+
+    .contact-grid {{
+
+        grid-template-columns:
+            1fr;
+
+        text-align:
+            center;
+
+        gap:
+            16px;
+    }}
+
+
+    .qr-footer-inner {{
+
+        grid-template-columns:
+            1fr;
+
+        text-align:
+            center;
+    }}
+
+
+    .footer-logo {{
+
+        margin:
+            auto;
+    }}
+
+}}
+
+</style>
 
 </head>
 
 
 <body>
 
-<!-- =====================================================
-     HEADER INSTITUCIONAL
-     ===================================================== -->
 
-<header class="header">
+<!-- =========================================================
+     HEADER REAL PUEBLA
+========================================================= -->
 
-    <div class="header-inner">
+<header class="qr-header">
 
-        <div class="logos">
-
-            <a
-                href="https://puebla.gob.mx/"
-                target="_blank"
-                rel="noopener"
-            >
-                <img
-                    class="logo-gob"
-                    src="https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg"
-                    alt="Gobierno del Estado de Puebla"
-                >
-            </a>
-
-            <img
-                class="logo-secretaria"
-                src="https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png"
-                alt="Secretaría de Movilidad y Transporte"
-            >
-
-        </div>
+<div class="qr-header-inner">
 
 
-        <img
-            class="frase-header"
-            src="https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg"
-            alt="Puebla"
-        >
+<div class="qr-brand">
 
-    </div>
+
+<a
+    href="https://puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+
+<img
+    class="logo-puebla"
+
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/header/logo_puebla_gob.svg
+    "
+
+    alt="
+Gobierno del Estado de Puebla
+    "
+>
+
+</a>
+
+
+<a
+    href="https://smt.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+
+<img
+    class="logo-smt"
+
+    src="
+https://smt.puebla.gob.mx/images/headers/MOVILIDAD_02.png
+    "
+
+    alt="
+Secretaría de Movilidad y Transporte
+    "
+>
+
+</a>
+
+
+</div>
+
+
+<img
+    class="logo-frase"
+
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/header/puebla_frases_gob.svg
+    "
+
+    alt="
+Gobierno de Puebla
+    "
+>
+
+
+</div>
 
 </header>
 
 
-<nav class="menu">
+<!-- =========================================================
+     MENÚ REAL
+========================================================= -->
 
-    <div class="menu-inner">
+<nav class="qr-menu">
 
-        <a
-            href="https://rl.puebla.gob.mx/"
-            target="_blank"
-            rel="noopener"
-        >
-            Pagos en línea
-        </a>
+<div class="qr-menu-inner">
 
-        <a
-            href="https://ventanilladigital.puebla.gob.mx/"
-            target="_blank"
-            rel="noopener"
-        >
-            Trámites
-        </a>
 
-    </div>
+<a
+    href="https://rl.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    Pagos en línea
+</a>
+
+
+<a
+    href="https://ventanilladigital.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    Trámites
+</a>
+
+
+</div>
 
 </nav>
 
 
-<!-- =====================================================
-     ENCABEZADO DE CONSULTA
-     ===================================================== -->
+<!-- =========================================================
+     HERO
+========================================================= -->
 
-<section class="hero">
+<section class="qr-hero">
 
-    <div class="hero-inner">
+<h1>
+    Resultado de Consulta
+</h1>
 
-        <h1>
-            Resultado de Consulta
-        </h1>
-
-        <p>
-            Consulta de permiso vehicular
-        </p>
-
-    </div>
+<p>
+    Secretaría de Movilidad y Transporte
+</p>
 
 </section>
 
 
-<!-- =====================================================
-     RESULTADO DINÁMICO
-     ===================================================== -->
+<!-- =========================================================
+     RESULTADO QR
+========================================================= -->
 
-<main class="contenido">
+<main class="qr-main">
 
     {estado_html}
 
 </main>
 
 
-<!-- =====================================================
+<!-- =========================================================
      CONTACTO
-     ===================================================== -->
+========================================================= -->
 
-<section class="contacto">
+<section class="contact-strip">
 
-    <div class="contacto-grid">
-
-        <div class="contacto-item">
-
-            <strong>
-                Contáctanos
-            </strong>
-
-            (222) 2 29 06 00
-            <br>
-            Ext. 1000 y 3503
-
-        </div>
+<div class="contact-grid">
 
 
-        <div class="contacto-item">
+<div class="contact-item">
 
-            <strong>
-                Dirección
-            </strong>
+<strong>
+    Contáctanos
+</strong>
 
-            Av. Rosendo Márquez 1501
-            <br>
-            Col. La Paz, Puebla, Pue.
+(222) 2 29 06 00
 
-        </div>
+<br>
 
+Ext. 1000 y 3503
 
-        <div class="contacto-item">
-
-            <strong>
-                Correo electrónico
-            </strong>
-
-            movilidadytransporte@puebla.gob.mx
-
-        </div>
-
-    </div>
-
-</section>
+</div>
 
 
-<!-- =====================================================
-     TRANSPARENCIA
-     ===================================================== -->
+<div class="contact-item">
 
-<section class="transparencia">
+<strong>
+    Dirección
+</strong>
 
-    <div class="transparencia-inner">
+Av. Rosendo Márquez 1501
 
-        <h2>
-            TRANSPARENCIA
-        </h2>
+<br>
 
-        <div class="transparencia-links">
+Colonia La Paz, C.P. 72160
 
-            <a
-                href="https://planeader.puebla.gob.mx/"
-                target="_blank"
-                rel="noopener"
-            >
-                PLAN ESTATAL DE DESARROLLO
-            </a>
+<br>
 
-            <a
-                href="https://transparenciafiscal.puebla.gob.mx/"
-                target="_blank"
-                rel="noopener"
-            >
-                TRANSPARENCIA FISCAL
-            </a>
+Puebla, Pue.
 
-            <a
-                href="https://www.gob.mx/empleo"
-                target="_blank"
-                rel="noopener"
-            >
-                PORTAL DEL EMPLEO
-            </a>
+</div>
 
-            <a
-                href="https://presupuestociudadano.puebla.gob.mx/"
-                target="_blank"
-                rel="noopener"
-            >
-                PRESUPUESTO CIUDADANO
-            </a>
 
-        </div>
+<div class="contact-item">
 
-    </div>
+<strong>
+    Correo electrónico
+</strong>
+
+movilidadytransporte@puebla.gob.mx
+
+</div>
+
+
+</div>
 
 </section>
 
 
-<!-- =====================================================
+<!-- =========================================================
+     REDES OFICIALES
+========================================================= -->
+
+<section class="social-section">
+
+<div class="social-inner">
+
+
+<div class="social-title">
+
+<strong>
+    MANTENTE
+</strong>
+
+AL DÍA
+
+</div>
+
+
+<div class="social-icons">
+
+
+<a
+    href="
+https://www.facebook.com/share/16oEpS2k6P/?mibextid=wwXIfr
+    "
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Facebook"
+>
+
+<img
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/icons/icon_redes/icon_f.svg
+    "
+    alt="Facebook"
+>
+
+</a>
+
+
+<a
+    href="
+https://x.com/mtgobpue?s=21&t=9rxyoSfKsdWZorPTBsx6bA
+    "
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="X"
+>
+
+<img
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/icons/icon_redes/icon_x.svg
+    "
+    alt="X"
+>
+
+</a>
+
+
+<a
+    href="
+https://www.instagram.com/mtgobpue
+    "
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Instagram"
+>
+
+<img
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/icons/icon_redes/icon_in.svg
+    "
+    alt="Instagram"
+>
+
+</a>
+
+
+<a
+    href="
+https://www.tiktok.com/@mtgobpue
+    "
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="TikTok"
+>
+
+<img
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/icons/icon_redes/icon_tt.svg
+    "
+    alt="TikTok"
+>
+
+</a>
+
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- =========================================================
      FOOTER
-     ===================================================== -->
+========================================================= -->
 
-<footer class="footer">
+<footer class="qr-footer">
 
-    <div class="footer-inner">
-
-        <div>
-
-            <img
-                class="footer-logo"
-                src="https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg"
-                alt="Gobierno del Estado de Puebla"
-            >
-
-        </div>
+<div class="qr-footer-inner">
 
 
-        <ul class="footer-links">
+<div>
 
-            <li>
-                <a
-                    href="https://planeader.puebla.gob.mx/"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    PLAN ESTATAL DE DESARROLLO
-                </a>
-            </li>
+<img
+    class="footer-logo"
 
-            <li>
-                <a
-                    href="https://transparenciafiscal.puebla.gob.mx/"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    TRANSPARENCIA FISCAL
-                </a>
-            </li>
+    src="
+https://smt.puebla.gob.mx/templates/puebla/images/footer/Escudo_pie.svg
+    "
 
-            <li>
-                <a
-                    href="https://www.gob.mx/empleo"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    PORTAL DEL EMPLEO
-                </a>
-            </li>
+    alt="
+Gobierno del Estado de Puebla
+    "
+>
 
-            <li>
-                <a
-                    href="https://www.gob.mx/presidencia"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    PRESIDENCIA DE LA REPÚBLICA
-                </a>
-            </li>
+</div>
 
-            <li>
-                <a
-                    href="https://lgcg.puebla.gob.mx/"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    LEY GENERAL DE CONTABILIDAD GUBERNAMENTAL
-                </a>
-            </li>
 
-        </ul>
+<ul class="footer-links">
 
-    </div>
+
+<li>
+
+<a
+    href="https://planeader.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    PLAN ESTATAL DE DESARROLLO
+</a>
+
+</li>
+
+
+<li>
+
+<a
+    href="https://transparenciafiscal.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    TRANSPARENCIA FISCAL
+</a>
+
+</li>
+
+
+<li>
+
+<a
+    href="https://www.gob.mx/empleo"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    PORTAL DEL EMPLEO
+</a>
+
+</li>
+
+
+<li>
+
+<a
+    href="https://presupuestociudadano.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    PRESUPUESTO CIUDADANO
+</a>
+
+</li>
+
+
+<li>
+
+<a
+    href="https://www.gob.mx/presidencia"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    PRESIDENCIA DE LA REPÚBLICA
+</a>
+
+</li>
+
+
+<li>
+
+<a
+    href="https://lgcg.puebla.gob.mx/"
+    target="_blank"
+    rel="noopener noreferrer"
+>
+    LEY GENERAL DE CONTABILIDAD GUBERNAMENTAL
+</a>
+
+</li>
+
+
+</ul>
+
+
+</div>
 
 </footer>
 
 
-<div class="copyright">
+<div class="qr-copyright">
 
-    © {year} Gobierno del Estado de Puebla
+© {year} Gobierno del Estado de Puebla
 
 </div>
 
 
 </body>
+
 </html>
 """
+
 
         return HTMLResponse(
             content=pagina,
             status_code=200
         )
 
+
+    # ==========================================================
+    # ERROR
+    # ==========================================================
+
     except Exception as e:
 
         print(
-            f"[ESTADO_FOLIO] Error consultando "
-            f"{folio}: {e}"
+            "[ESTADO_FOLIO] "
+            f"Error consultando {folio}: "
+            f"{repr(e)}"
         )
 
         return HTMLResponse(
             content="""
 <!DOCTYPE html>
+
 <html lang="es">
+
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Error de consulta</title>
-</head>
-<body style="
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+    Error de consulta
+</title>
+
+<style>
+
+body {
     margin:0;
+    padding:30px;
     background:#f4f4f4;
     font-family:Arial,sans-serif;
-">
-    <div style="
-        max-width:600px;
-        margin:80px auto;
-        background:white;
-        padding:35px;
-        border-radius:15px;
-        text-align:center;
-        box-shadow:0 5px 20px rgba(0,0,0,0.1);
-    ">
-        <h2 style="color:#5f1b2d;">
-            No fue posible realizar la consulta
-        </h2>
-        <p style="color:#777;">
-            Inténtelo nuevamente más tarde.
-        </p>
-    </div>
+}
+
+.error-card {
+    width:100%;
+    max-width:600px;
+    margin:60px auto;
+    background:white;
+    border-radius:18px;
+    padding:35px;
+    text-align:center;
+    box-shadow:
+        0 8px 28px
+        rgba(0,0,0,.12);
+}
+
+.error-card h2 {
+    color:#5f1b2d;
+}
+
+.error-card p {
+    color:#777;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="error-card">
+
+<h2>
+    No fue posible realizar la consulta
+</h2>
+
+<p>
+    Inténtelo nuevamente más tarde.
+</p>
+
+</div>
+
 </body>
+
 </html>
 """,
             status_code=500
-        )
-        
+)
+
 @app.get("/api/consultar_folio/{folio}")
 async def api_consultar(folio: str):
     folio = folio.strip().upper()
