@@ -1,9 +1,9 @@
 # ============================================================
 # consulta_publica.py
-# Página pública de consulta de folio (QR) - Puebla SMT
-# Diseño basado en smt.puebla.gob.mx
+# Consulta pública de folio (QR) - Puebla SMT
+# Usa el diseño oficial de smt.puebla.gob.mx (mismos CSS/estructura)
 #
-# USO en main.py (2 líneas):
+# USO en main_puebla.py:
 #   from consulta_publica import crear_router_consulta
 #   app.include_router(crear_router_consulta(supabase, ENTIDAD, TZ))
 # ============================================================
@@ -15,6 +15,422 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+SMT = "https://smt.puebla.gob.mx"
+
+# ------------------------------------------------------------
+# CSS: bloques inline del sitio oficial + estilos del resultado.
+# (String normal: las llaves van sencillas)
+# ------------------------------------------------------------
+CSS_EXTRA = """
+:root {
+    --hue: 214;
+    --template-bg-light: #f0f4fb;
+    --template-text-dark: #495057;
+    --template-text-light: #ffffff;
+    --template-link-color: var(--link-color);
+    --template-special-color: #001B4C;
+}
+
+/* ---------- Módulo contacto (oficial) ---------- */
+.c-b2b2b2{ color:#b2b2b2; font-size:1.25rem; }
+.image-correo{ height:35px; filter:brightness(0) saturate(100%) invert(80%) sepia(3%) saturate(0%) hue-rotate(180deg); }
+.image-telefono{ height:40px; filter:brightness(0) saturate(100%) invert(80%) sepia(3%) saturate(0%) hue-rotate(180deg); }
+.contour{ margin:20px 0 20px 0; background-color:white; color:#c2c2c2; border-radius:20px; padding:12px; z-index:1; }
+.correo-container, .telefono-container{ display:flex; align-items:center; gap:8px; }
+.lin a, .lin a:hover, .lin a:visited, .lin a:focus{ color:#c2c2c2; }
+.contac-email{ word-break:break-word; }
+@media only screen and (max-width:959px){
+  .dire{ text-align:center; }
+  .correo-container, .telefono-container{ flex-direction:column; }
+}
+
+/* ---------- Módulo "Mantente al día" (oficial) ---------- */
+.image-facebook{width:50px;}
+.image-twitter{width:50px;}
+.image-instagram{width:50px;}
+.image-tiktok{width:50px;}
+.image-email{height:50px;}
+.boton{ background-color:#c09761; border-radius:35px; padding:10px; box-shadow:0 0 10px 3px rgba(0,0,0,.20); z-index:1; }
+.bgc-e3e3e3{ background-color:#e3e3e3; }
+.titulo{ color:white; font-size:1.2rem; padding-top:15px; }
+.titul{ color:white; font-size:1.1rem; font-weight:300; }
+.titu{ color:#949494; font-size:1.2rem; font-weight:400; align-content:center; }
+
+/* ---------- Transparencia (oficial) ---------- */
+.text-2024{ font-family:'Corra Montserra'; font-weight:300; font-size:26pt; color:#b2b2b1; }
+.grayScale-2024{ filter:grayscale(100%)!important; opacity:.5!important; }
+
+/* ---------- Footer (oficial) ---------- */
+.escudo img{ width:560px; height:auto; }
+.image-hover{ display:block; position:relative; width:auto; height:80px; overflow:hidden; }
+.image-hover img{ display:block; width:100%; height:100%; position:absolute; top:0; left:0; transition:opacity .3s ease; }
+.image-hover .image-1{ opacity:1; }
+.image-hover .image-2{ opacity:0; }
+.image-hover:hover .image-1{ opacity:0; }
+.image-hover:hover .image-2{ opacity:1; }
+.Te_Recomendamos a, .Te_Recomendamos a:hover, .Te_Recomendamos a:visited, .Te_Recomendamos a:focus{
+  color:#fffbef; font-size:14pt; line-height:1.8;
+}
+
+/* =====================================================
+   CAJÓN DE RESULTADO  (prefijo rc-)
+   Misma paleta y bordes redondeados del sitio.
+   Una sola tipografía: hereda la del sitio.
+===================================================== */
+.rc-wrap{ max-width:1000px; margin:30px auto 20px; padding:0 20px; font-family:inherit; }
+.rc-wrap *{ font-family:inherit; box-sizing:border-box; }
+
+.rc-head{ text-align:center; margin-bottom:24px; }
+.rc-head small{ display:block; color:#c79b66; font-size:1.2rem; margin-bottom:4px; }
+.rc-head h1{ margin:0; color:#5f1b2d; font-size:2rem; font-weight:300; line-height:1.2; }
+.rc-head p{ margin:8px 0 0; color:#949494; font-size:1.1rem; }
+
+.rc-card{ background:#f6f6f6; border-radius:25px; overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,.10); }
+
+.rc-status{ display:flex; align-items:center; gap:18px; padding:24px 30px; }
+.rc-status.ok{ background:#e6f4e8; color:#155724; }
+.rc-status.venc{ background:#fff7dc; color:#856404; }
+.rc-status.err{ background:#f8d7da; color:#721c24; }
+.rc-ico{ width:54px; height:54px; flex:0 0 54px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; font-size:1.8rem; font-weight:700; color:#fff; line-height:1; }
+.rc-status.ok .rc-ico{ background:#38934d; }
+.rc-status.venc .rc-ico{ background:#d59e16; }
+.rc-status.err .rc-ico{ background:#b72f3c; }
+.rc-status h2{ margin:0 0 3px; font-size:1.25rem; font-weight:700; letter-spacing:.5px; color:inherit; }
+.rc-status p{ margin:0; font-size:1rem; line-height:1.4; color:inherit; }
+
+.rc-body{ padding:28px 30px 32px; }
+
+.rc-folio{ text-align:center; padding-bottom:24px; }
+.rc-folio span{ display:block; color:#949494; font-size:.85rem; font-weight:600; letter-spacing:3px; margin-bottom:6px; }
+.rc-folio strong{ display:block; color:#5f1b2d; font-size:2.2rem; font-weight:600; letter-spacing:1px; overflow-wrap:anywhere; }
+.rc-folio i{ display:block; width:70px; height:4px; background:#c79b66; border-radius:4px; margin:14px auto 0; }
+
+.rc-sub{ color:#c79b66; font-size:1.2rem; margin:0 0 14px; padding-bottom:8px; border-bottom:1px solid #e3e3e3; }
+
+.rc-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.rc-item{ background:#fff; border-radius:14px; border-left:5px solid #c79b66; padding:14px 18px; min-width:0; }
+.rc-item.wide{ grid-column:span 2; }
+.rc-item span{ display:block; color:#949494; font-size:.75rem; font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+/* TODOS los valores iguales: mismo tamaño, peso y fuente */
+.rc-item strong{ display:block; color:#4b4b4b; font-size:1.05rem; font-weight:500; line-height:1.4; overflow-wrap:anywhere; }
+
+.rc-vig{ margin-top:26px; background:#fff; border-radius:14px; border-left:5px solid #c79b66; padding:18px 20px; }
+.rc-bar{ height:12px; background:#e3e3e3; border-radius:20px; overflow:hidden; }
+.rc-bar b{ display:block; height:100%; border-radius:20px; }
+.rc-bar b.ok{ background:linear-gradient(90deg,#c79b66,#38934d); }
+.rc-bar b.venc{ background:linear-gradient(90deg,#c79b66,#d59e16); }
+.rc-vig-txt{ margin-top:10px; text-align:center; color:#949494; font-size:.95rem; }
+
+.rc-note{ margin-top:22px; background:#fff; border-radius:14px; border-left:5px solid #5f1b2d; padding:14px 18px; color:#949494; font-size:.9rem; line-height:1.55; }
+.rc-note b{ color:#5f1b2d; font-weight:600; }
+
+.rc-empty{ padding:34px 30px 40px; text-align:center; color:#949494; font-size:1.05rem; line-height:1.6; }
+
+@media (max-width:640px){
+  .rc-wrap{ padding:0 12px; margin-top:20px; }
+  .rc-head h1{ font-size:1.6rem; }
+  .rc-head p{ font-size:1rem; }
+  .rc-card{ border-radius:20px; }
+  .rc-status{ padding:18px 18px; gap:14px; }
+  .rc-ico{ width:44px; height:44px; flex-basis:44px; font-size:1.4rem; }
+  .rc-status h2{ font-size:1.05rem; }
+  .rc-status p{ font-size:.9rem; }
+  .rc-body{ padding:22px 16px 26px; }
+  .rc-folio strong{ font-size:1.6rem; }
+  .rc-grid{ grid-template-columns:1fr; }
+  .rc-item.wide{ grid-column:span 1; }
+}
+"""
+
+
+def _esc(valor):
+    return html_lib.escape(str(valor if valor not in (None, "") else "—"))
+
+
+def _parse_fecha(valor):
+    if not valor:
+        return None
+    texto = str(valor).strip()
+    try:
+        return datetime.fromisoformat(texto.replace("Z", "+00:00")).date()
+    except Exception:
+        try:
+            return datetime.strptime(texto[:10], "%Y-%m-%d").date()
+        except Exception:
+            return None
+
+
+def _pagina(contenido: str, anio: int) -> str:
+    """Página completa con la estructura oficial de smt.puebla.gob.mx."""
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Secretaria de Movilidad y Transporte">
+<title>.: Secretaría de Movilidad y Transporte :.</title>
+<link href="{SMT}/templates/puebla/favicon.ico" rel="icon" type="image/vnd.microsoft.icon">
+
+<link href="{SMT}/templates/puebla/uikit-3.23.5/css/uikit.min.css" rel="stylesheet">
+<link href="{SMT}/templates/puebla/css/template.css" rel="stylesheet">
+<link href="{SMT}/templates/puebla/css/puebla.css" rel="stylesheet">
+<link href="{SMT}/templates/puebla/css/nanoscroller.css" rel="stylesheet">
+<link href="{SMT}/templates/puebla/html/mod_menu/css/style.css" rel="stylesheet">
+<style>{CSS_EXTRA}</style>
+
+<script src="{SMT}/templates/puebla/uikit-3.23.5/js/uikit.min.js"></script>
+<script src="{SMT}/templates/puebla/uikit-3.23.5/js/uikit-icons.min.js"></script>
+</head>
+
+<body>
+
+<header class="header" id="header">
+  <div class="uk-grid header-inner" uk-grid>
+    <div class="uk-width-3-5@s uk-padding-remove">
+      <div class="uk-flex uk-flex-left uk-flex-middle uk-flex-nowrap">
+        <div>
+          <a href="https://puebla.gob.mx">
+            <img src="{SMT}/templates/puebla/images/header/logo_puebla_gob.svg" class="img-header" alt="Logo Puebla Gobierno">
+          </a>
+        </div>
+        <div>
+          <a href="{SMT}/">
+            <img class="img-header" alt="Logo de Secretaría" src="{SMT}/images/headers/MOVILIDAD_02.png">
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="uk-width-2-5@s uk-padding-remove uk-visible@s">
+      <div class="uk-flex uk-flex-right uk-flex-middle uk-flex-nowrap">
+        <div class="frase">
+          <img src="{SMT}/templates/puebla/images/header/puebla_frases_gob.svg" class="img-header" alt="Frase Amor a Puebla Gobierno" style="padding-left: 20px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="uk-margin-remove uk-flex uk-flex-middle uk-visible@s" uk-grid>
+    <div class="uk-width-expand@m uk-padding-remove">
+      <div class="menu-container">
+        <ul class="mod-menu mod-menu_dropdown-metismenu metismenu mod-list ">
+<li class="metismenu-item item-119 level-1"><a href="https://rl.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">Pagos en línea</a></li><li class="metismenu-item item-120 level-1"><a href="https://ventanilladigital.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">Trámites</a></li><li class="metismenu-item item-136 level-1"><a href="{SMT}/images/documentos/DIT_E081_SMT.pdf">DIT</a></li></ul>
+      </div>
+    </div>
+    <div class="uk-width-1-5@m uk-margin-remove">
+      <div class="search-container uk-margin-remove uk-padding-small uk-align-right"></div>
+    </div>
+  </div>
+
+  <div class="menu-container uk-grid uk-child-width-1-3 uk-flex-middle uk-margin-remove uk-padding-remove uk-hidden@s" uk-grid>
+    <div class="uk-text-left"></div>
+    <div class="uk-text-center">
+      <a href="#offcanvas" class="uk-hidden@s c-484747 bgch-484747" uk-toggle="target: #offcanvas-flip">
+        <span uk-icon="icon: menu; ratio: 2"></span>
+      </a>
+    </div>
+    <div class="uk-text-right"></div>
+  </div>
+</header>
+
+<div class="body">
+
+  <div class="uk-margin-top"></div>
+
+  <div class="above-top">
+    <div class="container">
+<div class="mod-custom custom">
+    <div class=" contour ">
+  <div class="uk-grid-match uk-margin-remove" uk-grid>
+
+    <div class="uk-width-auto@m uk-width-1-1@s">
+      <div class="uk-text-center uk-flex uk-flex-center correo-container lin">
+        <span class="c-b2b2b2">Contáctanos</span>
+      </div>
+    </div>
+
+    <div class="uk-width-1-4@m uk-width-1-1@s">
+      <div class="uk-text-center uk-flex uk-flex-center telefono-container dire">
+        <img class="image-telefono c-794141" src="{SMT}/templates/puebla/images/icons/contact/icon_phone.svg" alt="Telefono">
+        <p class="c-b2b2b2 uk-text-bold">(222) 2 29 06 00 Ext. 1000 y 3503</p>
+      </div>
+    </div>
+
+    <div class="uk-width-1-4@m uk-width-1-1@s">
+      <div class="dire">
+        <span class="c-b2b2b2">Av. Rosendo Márquez 1501 colonia La Paz<br>CP. 72160 Puebla, Pue.</span>
+      </div>
+    </div>
+
+    <div class="uk-width-auto@m uk-width-1-1@s">
+      <div class="uk-text-center uk-flex uk-flex-center correo-container contac-email lin">
+        <img class="image-correo" src="{SMT}/templates/puebla/images/icons/contact/icon_mail.svg" alt="Correo">
+        <span class="c-b2b2b2">movilidadytransporte@puebla.gob.mx</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+    </div>
+  </div>
+
+  <div class="main-top">
+    <div class="container">
+{contenido}
+    </div>
+  </div>
+
+  <div class="below-top">
+    <div class="container">
+<div class="mod-custom custom">
+    <div class="uk-container uk-container-large bgc-e3e3e3">
+  <div class="uk-grid-match" uk-grid>
+    <div class="uk-padding uk-width-2-3@m uk-width-1-1@s">
+      <div class="titu uk-text-center"><strong>MANTENTE</strong> AL DÍA</div>
+      <div class="uk-flex uk-flex-center ">
+        <div class="uk-padding-small">
+          <a href="https://www.facebook.com/share/16oEpS2k6P/?mibextid=wwXIfr" class="uk-margin-remove" target="_blank" aria-label="Facebook">
+            <img class="image-facebook" src="{SMT}/templates/puebla/images/icons/icon_redes/icon_f.svg" alt="Facebook">
+          </a>
+        </div>
+        <div class="uk-padding-small">
+          <a href="https://x.com/mtgobpue?s=21&amp;t=9rxyoSfKsdWZorPTBsx6bA" target="_blank" aria-label="Twitter">
+            <img class="image-twitter" src="{SMT}/templates/puebla/images/icons/icon_redes/icon_x.svg" alt="X">
+          </a>
+        </div>
+        <div class="uk-padding-small">
+          <a href="https://www.instagram.com/mtgobpue?igsh=eW8zbTl0YXQwNGJ4&amp;utm_source=qr" class="uk-margin-remove" target="_blank" aria-label="Instagram">
+            <img class="image-instagram" src="{SMT}/templates/puebla/images/icons/icon_redes/icon_in.svg" alt="Instagram">
+          </a>
+        </div>
+        <div class="uk-padding-small">
+          <a href="https://www.tiktok.com/@mtgobpue?_t=ZS-8yiQkNHYYWV&amp;_r=1" class="uk-margin-remove" target="_blank" aria-label="Tiktok">
+            <img class="image-tiktok" src="{SMT}/templates/puebla/images/icons/icon_redes/icon_tt.svg" alt="TikTok">
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="uk-padding uk-width-1-3@m uk-width-1-1@s">
+      <div class="boton uk-text-center uk-margin">
+        <div class="titulo">CONTACTO</div>
+        <div class="uk-padding contac-email">
+          <img class="image-email" src="{SMT}/templates/puebla/images/icons/icon_redes/icon_email.svg" alt="Correo">
+          <span class="titul">movilidadytransporte@puebla.gob.mx</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+    </div>
+  </div>
+
+  <div class="below-bottom">
+    <div class="">
+<div class="mod-custom custom">
+     <div class="uk-container ">
+  <div uk-grid>
+    <div class="uk-width-1-3@l uk-width-1-3@m uk-width-1-1@s uk-width-1-1@xs">
+      <h2 class="text-2024 uk-margin-remove" tabindex="0">TRANSPARENCIA</h2>
+    </div>
+    <div class="uk-width-1-3@l uk-width-1-3@m uk-width-1-2@s uk-width-1-2@xs grayScale-2024">
+      <div class="uk-width-3-4 uk-width-1@l uk-margin-auto">
+        <a href="https://www.plataformadetransparencia.org.mx/web/guest/inicio" title="Plataforma nacional de transparencia" target="_blank">
+          <img src="{SMT}/templates/puebla/images/transparencia/transparencia.png" width="80%" alt="Plataforma nacional de transparencia">
+        </a>
+      </div>
+    </div>
+    <div class="uk-width-1-3@l uk-width-1-3@m uk-width-1-2@s uk-width-1-2@xs grayScale-2024">
+      <div class="uk-width-3-4 uk-width-1@l uk-margin-auto">
+        <a href="https://consultapublicamx.plataformadetransparencia.org.mx/vut-web/faces/view/consultaPublica.xhtml?idEntidad=MjE=&amp;idOrgano=MjE=&amp;idSujetoObligado=MjMyNTc=#inicio" title="Consulta nuestras obligaciones de transparencia" target="_blank">
+          <img src="{SMT}/templates/puebla/images/transparencia/consulta.png" width="80%" alt="Consulta nuestras obligaciones de transparencia">
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="footer  uk-position-relative">
+  <div class="uk-container footer-container uk-container uk-flex uk-flex-center">
+    <div class="uk-position-absolute uk-padding-remove uk-margin-remove uk-width-1-1 uk-flex uk-flex-center sombra-footer">
+      <img src="{SMT}/templates/puebla/images/footer/sombra_vertical.png" class="sombra-vertical uk-visible@m" alt="Sombra Vertical">
+    </div>
+    <div class="uk-flex uk-flex-middle uk-flex-center uk-padding-remove uk-margin-remove" uk-grid>
+      <div class="uk-width-1-2@xl uk-width-1-2@l uk-width-1-2@m uk-width-1-2@s uk-width-1-1@xs">
+        <div class="uk-flex uk-flex-middle uk-flex-center uk-padding">
+<div class="mod-custom custom">
+    <div class="Uk-container uk-padding escudo">
+      <img src="{SMT}/templates/puebla/images/footer/Escudo_pie.svg" alt="Gobierno del Estado de Puebla">
+    </div>
+    <div class="image-hover">
+      <img src="{SMT}/templates/puebla/images/footer/icon_911.svg" class="image-1" alt="911">
+      <img src="{SMT}/templates/puebla/images/footer/icon_911_hover.svg" class="image-2" alt="911">
+    </div>
+</div>
+        </div>
+      </div>
+      <img src="{SMT}/templates/puebla/images/footer/sombra_horizontal.png" class="sombra-horizontal uk-hidden@m" alt="Sombra Horizontal">
+      <div class="uk-width-1-2@xl uk-width-1-2@l uk-width-1-2@m uk-width-1-2@s uk-width-1-1@xs">
+        <div class="uk-flex uk-flex-middle uk-flex-center uk-padding">
+<div class="mod-custom custom">
+    <ul class="uk-list">
+<li class="Te_Recomendamos" tabindex="0"><a href="https://planeader.puebla.gob.mx/" target="_blank">PLAN ESTATAL DE DESARROLLO</a></li>
+<li class="Te_Recomendamos" tabindex="0"><a href="https://transparenciafiscal.puebla.gob.mx/" target="_blank">TRANSPARENCIA FISCAL</a></li>
+<li class="Te_Recomendamos" tabindex="0"><a href="https://www.gob.mx/empleo" target="_blank">PORTAL DEL EMPLEO</a></li>
+<li class="Te_Recomendamos" tabindex="0"><a href="https://presupuestociudadano.puebla.gob.mx/" target="_blank">PRESUPUESTO CIUDADANO</a></li>
+<li class="Te_Recomendamos" tabindex="0"><a href="https://www.gob.mx/presidencia" target="_blank">PRESIDENCIA DE LA REPÚBLICA</a></li>
+<li class="Te_Recomendamos" tabindex="0"><a href="https://lgcg.puebla.gob.mx/" target="_blank">LEY GENERAL DE CONTABILIDAD GUBERNAMENTAL</a></li>
+</ul>
+</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="copyright">
+  <div class="uk-width-1-1 uk-flex uk-flex-center uk-padding-remove uk-margin-remove">
+    <div class="copyright-container  uk-padding-remove uk-margin-remove">
+<div class="mod-custom custom">
+    <img src="{SMT}/templates/puebla/images/footer/copyright.svg" class="cop" style="width:1400px; height:auto; background:#5f1b2d;" alt="© {anio} Gobierno del Estado de Puebla">
+</div>
+    </div>
+  </div>
+</div>
+
+<div id="offcanvas-flip" uk-offcanvas="mode: push; overlay: true; flip: true">
+  <div class="uk-offcanvas-bar uk-padding-remove">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+    <h3 class="uk-padding uk-padding-remove-bottom uk-margin-remove">Secretaria de Movilidad y Transporte</h3>
+<ul class="uk-nav uk-nav-default uk-nav-parent-icon uk-padding " uk-nav="multiple: true">
+    <li style="padding: 2px;"><a href="https://rl.puebla.gob.mx/">Pagos en línea</a></li>
+    <li style="padding: 2px;"><a href="https://ventanilladigital.puebla.gob.mx/">Trámites</a></li>
+    <li style="padding: 2px;"><a href="{SMT}/images/documentos/DIT_E081_SMT.pdf">DIT</a></li>
+</ul>
+  </div>
+</div>
+
+</body>
+</html>"""
+
+
+def _cabecera_resultado() -> str:
+    return """
+<div class="rc-head">
+  <small>Verificación oficial</small>
+  <h1>Consulta de permiso</h1>
+  <p>Secretaría de Movilidad y Transporte</p>
+</div>
+"""
+
 
 def crear_router_consulta(supabase, entidad: str, timezone: str) -> APIRouter:
 
@@ -24,313 +440,6 @@ def crear_router_consulta(supabase, entidad: str, timezone: str) -> APIRouter:
     async def estado_folio_qr(folio: str):
 
         folio = folio.strip().upper()
-
-        SMT = "https://smt.puebla.gob.mx"
-
-        def esc(valor):
-            return html_lib.escape(
-                str(valor if valor not in (None, "") else "—")
-            )
-
-        def parse_fecha(valor):
-            if not valor:
-                return None
-            texto = str(valor).strip()
-            try:
-                return datetime.fromisoformat(
-                    texto.replace("Z", "+00:00")
-                ).date()
-            except Exception:
-                try:
-                    return datetime.strptime(texto[:10], "%Y-%m-%d").date()
-                except Exception:
-                    return None
-
-        # ------------------------------------------------------------------
-        # CSS (string normal, SIN f-string, por eso las llaves van sencillas)
-        # Autocontenido: solo se usan imágenes del sitio oficial.
-        # ------------------------------------------------------------------
-        css = """
-    :root{
-      --vino:#5f1b2d; --vino-dark:#48101e; --dorado:#c09761; --dorado2:#c79b66;
-      --gris:#949494; --gris-txt:#6b6b6b; --fondo:#f0f4fb; --azul:#001B4C;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:var(--fondo);
-      font-family:"Montserrat","Segoe UI",Arial,Helvetica,sans-serif;color:#495057}
-    a{color:inherit}
-    img{max-width:100%;height:auto}
-
-    /* HEADER */
-    .hd{background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);position:relative;z-index:5}
-    .hd-in{max-width:1380px;margin:auto;padding:14px 30px;display:flex;
-      align-items:center;justify-content:space-between;gap:24px}
-    .hd-logos{display:flex;align-items:center;gap:20px;min-width:0}
-    .hd-logos img{height:78px;width:auto;object-fit:contain}
-    .hd-frase{height:70px;width:auto}
-
-    /* MENU */
-    .nav{background:var(--vino)}
-    .nav-in{max-width:1380px;margin:auto;padding:0 30px;display:flex;
-      justify-content:flex-end;flex-wrap:wrap}
-    .nav a{color:#fff;text-decoration:none;padding:16px 22px;font-size:14px;
-      letter-spacing:.3px;transition:background .2s}
-    .nav a:hover{background:rgba(255,255,255,.14)}
-
-    /* TITULO */
-    .titulo{max-width:1100px;margin:34px auto 0;padding:0 20px;text-align:center}
-    .titulo small{display:block;color:var(--dorado2);font-size:13px;font-weight:700;
-      letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
-    .titulo h1{margin:0;color:var(--vino);font-size:32px;font-weight:300}
-    .titulo p{margin:8px 0 0;color:var(--gris);font-size:15px}
-
-    /* TARJETA RESULTADO */
-    .wrap{max-width:1000px;margin:26px auto 0;padding:0 18px}
-    .res{background:#fff;border-radius:26px;overflow:hidden;
-      box-shadow:0 12px 40px rgba(0,0,0,.12)}
-
-    .banner{display:flex;align-items:center;gap:22px;padding:28px 34px;color:#fff}
-    .banner.ok{background:linear-gradient(120deg,#2e7d44,#3fa05a)}
-    .banner.venc{background:linear-gradient(120deg,#b9770e,#d9a21b)}
-    .banner.err{background:linear-gradient(120deg,#8e1f2e,#b72f3c)}
-    .banner-ico{width:64px;height:64px;flex:0 0 64px;border-radius:50%;
-      background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.75);
-      display:flex;align-items:center;justify-content:center;
-      font-size:34px;font-weight:700;line-height:1}
-    .banner h2{margin:0 0 4px;font-size:22px;font-weight:700;letter-spacing:.8px}
-    .banner p{margin:0;font-size:14px;opacity:.95;line-height:1.45}
-
-    .folio-box{text-align:center;padding:30px 20px 22px;
-      background:linear-gradient(#fbf8f4,#fff)}
-    .folio-box span{display:block;color:var(--gris);font-size:12px;font-weight:700;
-      letter-spacing:4px;margin-bottom:8px}
-    .folio-box strong{display:block;color:var(--vino);font-size:42px;
-      font-weight:700;letter-spacing:2px;overflow-wrap:anywhere}
-    .folio-box i{display:block;width:70px;height:4px;background:var(--dorado);
-      border-radius:4px;margin:16px auto 0}
-
-    .body{padding:10px 34px 34px}
-    .bloque{margin-top:26px}
-    .bloque h3{margin:0 0 14px;color:var(--vino);font-size:16px;font-weight:700;
-      letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
-    .bloque h3::after{content:"";flex:1;height:1px;background:#e8e8e8}
-
-    .titular{background:#faf7f3;border-left:5px solid var(--dorado);
-      border-radius:14px;padding:18px 22px}
-    .titular span,.dato span{display:block;color:#979797;font-size:11px;
-      font-weight:700;letter-spacing:.9px;text-transform:uppercase;margin-bottom:6px}
-    .titular strong{display:block;color:#3f3f3f;font-size:20px;font-weight:600;
-      overflow-wrap:anywhere}
-
-    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-    .dato{background:#f7f7f7;border-radius:12px;padding:15px 17px;min-width:0}
-    .dato strong{display:block;color:#444;font-size:16px;font-weight:600;
-      overflow-wrap:anywhere;line-height:1.35}
-    .dato.wide{grid-column:span 3}
-    .mono{font-family:"Courier New",monospace;letter-spacing:1.2px;font-size:17px!important}
-
-    /* VIGENCIA */
-    .vig{background:#f7f7f7;border-radius:14px;padding:20px 22px}
-    .vig-fechas{display:flex;justify-content:space-between;gap:14px;margin-bottom:14px}
-    .vig-fechas div{min-width:0}
-    .vig-fechas span{display:block;color:#979797;font-size:11px;font-weight:700;
-      letter-spacing:.9px;text-transform:uppercase;margin-bottom:5px}
-    .vig-fechas strong{font-size:18px;color:#3f3f3f}
-    .vig-fechas div:last-child{text-align:right}
-    .barra{height:12px;background:#e4e4e4;border-radius:20px;overflow:hidden}
-    .barra b{display:block;height:100%;border-radius:20px}
-    .barra b.ok{background:linear-gradient(90deg,#3fa05a,#2e7d44)}
-    .barra b.venc{background:linear-gradient(90deg,#d9a21b,#b9770e)}
-    .vig-txt{margin-top:10px;font-size:13px;color:var(--gris-txt);text-align:center}
-
-    /* SELLO / NOTA */
-    .sello{margin-top:26px;display:flex;gap:14px;align-items:flex-start;
-      background:#faf7f3;border-left:5px solid var(--dorado);border-radius:12px;
-      padding:16px 18px;color:#686868;font-size:13px;line-height:1.6}
-    .sello b{color:var(--vino)}
-    .sello .lock{font-size:22px;line-height:1}
-
-    .acciones{margin-top:22px;text-align:center}
-    .btn{display:inline-block;background:var(--vino);color:#fff;border:0;
-      padding:13px 28px;border-radius:10px;font-size:14px;font-weight:600;
-      cursor:pointer;font-family:inherit}
-    .btn:hover{background:var(--vino-dark)}
-
-    .noenc{padding:40px 34px 44px;text-align:center}
-    .noenc p{color:#777;font-size:15px;line-height:1.6;max-width:520px;margin:0 auto}
-
-    /* CONTACTO */
-    .contacto{max-width:1180px;margin:34px auto 0;padding:0 18px}
-    .contacto-in{background:#fff;border-radius:20px;padding:20px 26px;
-      box-shadow:0 4px 16px rgba(0,0,0,.07);display:grid;
-      grid-template-columns:auto 1.2fr 1.4fr 1.4fr;gap:22px;align-items:center}
-    .contacto-in div{color:#8a8a8a;font-size:14px;line-height:1.55}
-    .contacto-in .lbl{color:#b2b2b2;font-size:19px}
-    .contacto-in b{display:block;color:var(--dorado);margin-bottom:3px}
-
-    /* REDES */
-    .redes{background:#e3e3e3;margin-top:40px;padding:34px 20px;text-align:center}
-    .redes .t{color:#949494;font-size:20px;margin-bottom:18px;letter-spacing:1px}
-    .redes .ic{display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
-    .redes img{width:46px;height:46px}
-
-    /* TRANSPARENCIA */
-    .transp{max-width:1100px;margin:0 auto;padding:30px 20px;display:grid;
-      grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:center}
-    .transp h2{margin:0;color:#b2b2b1;font-weight:300;font-size:26px}
-    .transp img{width:80%;filter:grayscale(100%);opacity:.5}
-
-    /* FOOTER */
-    .ft{background:var(--vino);color:#fff;padding:44px 25px}
-    .ft-in{max-width:1150px;margin:auto;display:grid;grid-template-columns:1.1fr 1fr;
-      gap:46px;align-items:center}
-    .ft-logo{width:100%;max-width:520px}
-    .ft-911{height:64px;width:auto;margin-top:18px}
-    .ft ul{list-style:none;margin:0;padding:0}
-    .ft li{margin:7px 0}
-    .ft li a{color:#fffbef;text-decoration:none;font-size:14px;line-height:1.7}
-    .ft li a:hover{text-decoration:underline}
-    .cop{background:var(--vino-dark);color:rgba(255,255,255,.7);text-align:center;
-      font-size:12px;padding:15px 20px}
-
-    /* RESPONSIVE */
-    @media(max-width:860px){
-      .contacto-in{grid-template-columns:1fr;text-align:center}
-      .transp{grid-template-columns:1fr;text-align:center}
-      .transp img{width:60%}
-      .ft-in{grid-template-columns:1fr;text-align:center}
-      .ft-logo{margin:auto}
-    }
-    @media(max-width:640px){
-      .hd-in{padding:12px 14px;justify-content:center}
-      .hd-logos{gap:10px;width:100%;justify-content:center}
-      .hd-logos img{height:auto;max-height:54px;max-width:47%}
-      .hd-frase{display:none}
-      .nav-in{padding:0 6px;justify-content:center}
-      .nav a{padding:14px 12px;font-size:13px}
-      .titulo h1{font-size:25px}
-      .banner{padding:20px 18px;gap:14px}
-      .banner-ico{width:50px;height:50px;flex-basis:50px;font-size:27px}
-      .banner h2{font-size:17px}
-      .banner p{font-size:12.5px}
-      .folio-box strong{font-size:28px;letter-spacing:1px}
-      .body{padding:6px 16px 26px}
-      .grid{grid-template-columns:1fr 1fr}
-      .dato.wide{grid-column:span 2}
-      .vig-fechas strong{font-size:15px}
-      .res{border-radius:20px}
-    }
-    @media(max-width:380px){
-      .grid{grid-template-columns:1fr}
-      .dato.wide{grid-column:span 1}
-    }
-    @media print{
-      .nav,.contacto,.redes,.transp,.ft,.cop,.acciones{display:none!important}
-      body{background:#fff}
-      .res{box-shadow:none}
-    }
-    """
-
-        # ------------------------------------------------------------------
-        # Piezas fijas de la página (header / footer oficiales)
-        # ------------------------------------------------------------------
-        header_html = f"""
-    <header class="hd">
-      <div class="hd-in">
-        <div class="hd-logos">
-          <a href="https://puebla.gob.mx" target="_blank" rel="noopener noreferrer">
-            <img src="{SMT}/templates/puebla/images/header/logo_puebla_gob.svg" alt="Gobierno del Estado de Puebla">
-          </a>
-          <a href="{SMT}/" target="_blank" rel="noopener noreferrer">
-            <img src="{SMT}/images/headers/MOVILIDAD_02.png" alt="Secretaría de Movilidad y Transporte">
-          </a>
-        </div>
-        <img class="hd-frase" src="{SMT}/templates/puebla/images/header/puebla_frases_gob.svg" alt="Amor a Puebla Gobierno">
-      </div>
-    </header>
-    <nav class="nav">
-      <div class="nav-in">
-        <a href="https://rl.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">Pagos en línea</a>
-        <a href="https://ventanilladigital.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">Trámites</a>
-        <a href="{SMT}/images/documentos/DIT_E081_SMT.pdf" target="_blank" rel="noopener noreferrer">DIT</a>
-      </div>
-    </nav>
-    """
-
-        footer_html = f"""
-    <section class="contacto">
-      <div class="contacto-in">
-        <div class="lbl">Contáctanos</div>
-        <div><b>Teléfono</b>(222) 2 29 06 00<br>Ext. 1000 y 3503</div>
-        <div><b>Dirección</b>Av. Rosendo Márquez 1501, col. La Paz<br>C.P. 72160 Puebla, Pue.</div>
-        <div><b>Correo electrónico</b>movilidadytransporte@puebla.gob.mx</div>
-      </div>
-    </section>
-
-    <section class="redes">
-      <div class="t"><strong>MANTENTE</strong> AL DÍA</div>
-      <div class="ic">
-        <a href="https://www.facebook.com/share/16oEpS2k6P/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><img src="{SMT}/templates/puebla/images/icons/icon_redes/icon_f.svg" alt="Facebook"></a>
-        <a href="https://x.com/mtgobpue" target="_blank" rel="noopener noreferrer" aria-label="X"><img src="{SMT}/templates/puebla/images/icons/icon_redes/icon_x.svg" alt="X"></a>
-        <a href="https://www.instagram.com/mtgobpue" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><img src="{SMT}/templates/puebla/images/icons/icon_redes/icon_in.svg" alt="Instagram"></a>
-        <a href="https://www.tiktok.com/@mtgobpue" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><img src="{SMT}/templates/puebla/images/icons/icon_redes/icon_tt.svg" alt="TikTok"></a>
-      </div>
-    </section>
-
-    <section class="transp">
-      <h2>TRANSPARENCIA</h2>
-      <a href="https://www.plataformadetransparencia.org.mx/web/guest/inicio" target="_blank" rel="noopener noreferrer"><img src="{SMT}/templates/puebla/images/transparencia/transparencia.png" alt="Plataforma nacional de transparencia"></a>
-      <a href="https://consultapublicamx.plataformadetransparencia.org.mx/vut-web/faces/view/consultaPublica.xhtml?idEntidad=MjE=&amp;idOrgano=MjE=&amp;idSujetoObligado=MjMyNTc=#inicio" target="_blank" rel="noopener noreferrer"><img src="{SMT}/templates/puebla/images/transparencia/consulta.png" alt="Obligaciones de transparencia"></a>
-    </section>
-
-    <footer class="ft">
-      <div class="ft-in">
-        <div>
-          <img class="ft-logo" src="{SMT}/templates/puebla/images/footer/Escudo_pie.svg" alt="Gobierno del Estado de Puebla">
-          <img class="ft-911" src="{SMT}/templates/puebla/images/footer/icon_911.svg" alt="911">
-        </div>
-        <ul>
-          <li><a href="https://planeader.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">PLAN ESTATAL DE DESARROLLO</a></li>
-          <li><a href="https://transparenciafiscal.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">TRANSPARENCIA FISCAL</a></li>
-          <li><a href="https://www.gob.mx/empleo" target="_blank" rel="noopener noreferrer">PORTAL DEL EMPLEO</a></li>
-          <li><a href="https://presupuestociudadano.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">PRESUPUESTO CIUDADANO</a></li>
-          <li><a href="https://www.gob.mx/presidencia" target="_blank" rel="noopener noreferrer">PRESIDENCIA DE LA REPÚBLICA</a></li>
-          <li><a href="https://lgcg.puebla.gob.mx/" target="_blank" rel="noopener noreferrer">LEY GENERAL DE CONTABILIDAD GUBERNAMENTAL</a></li>
-        </ul>
-      </div>
-    </footer>
-    """
-
-        def armar_pagina(contenido: str, anio: int) -> str:
-            return f"""<!DOCTYPE html>
-    <html lang="es">
-    <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex, nofollow">
-    <meta name="description" content="Secretaría de Movilidad y Transporte - Consulta de permiso">
-    <title>.: Secretaría de Movilidad y Transporte :.</title>
-    <link rel="icon" href="{SMT}/templates/puebla/favicon.ico" type="image/vnd.microsoft.icon">
-    <style>{css}</style>
-    </head>
-    <body>
-    {header_html}
-
-    <section class="titulo">
-      <small>Verificación oficial</small>
-      <h1>Consulta de Permiso</h1>
-      <p>Secretaría de Movilidad y Transporte</p>
-    </section>
-
-    <main class="wrap">
-    {contenido}
-    </main>
-
-    {footer_html}
-
-    <div class="cop">© {anio} Gobierno del Estado de Puebla. Secretaría de Movilidad y Transporte.</div>
-    </body>
-    </html>"""
 
         try:
 
@@ -346,43 +455,48 @@ def crear_router_consulta(supabase, entidad: str, timezone: str) -> APIRouter:
 
             hoy = datetime.now(ZoneInfo(timezone)).date()
 
-            # ==============================================================
+            # ------------------------------------------------------
             # FOLIO NO ENCONTRADO
-            # ==============================================================
+            # ------------------------------------------------------
             if not res.data:
 
                 contenido = f"""
-    <article class="res">
-      <div class="banner err">
-        <div class="banner-ico">×</div>
-        <div>
-          <h2>FOLIO NO ENCONTRADO</h2>
-          <p>No existe un permiso registrado con este folio.</p>
-        </div>
+<div class="rc-wrap">
+{_cabecera_resultado()}
+  <div class="rc-card">
+    <div class="rc-status err">
+      <div class="rc-ico">×</div>
+      <div>
+        <h2>FOLIO NO ENCONTRADO</h2>
+        <p>No existe un permiso registrado con este folio.</p>
       </div>
-      <div class="folio-box">
+    </div>
+    <div class="rc-body">
+      <div class="rc-folio">
         <span>FOLIO CONSULTADO</span>
-        <strong>{esc(folio)}</strong>
+        <strong>{_esc(folio)}</strong>
         <i></i>
       </div>
-      <div class="noenc">
-        <p>Verifica que el folio esté capturado correctamente. Si el problema
-        continúa, comunícate con la Secretaría de Movilidad y Transporte.</p>
+      <div class="rc-empty" style="padding-top:0">
+        Verifica que el folio esté capturado correctamente. Si el problema
+        continúa, comunícate con la Secretaría de Movilidad y Transporte.
       </div>
-    </article>
-    """
+    </div>
+  </div>
+</div>
+"""
                 return HTMLResponse(
-                    content=armar_pagina(contenido, hoy.year),
+                    content=_pagina(contenido, hoy.year),
                     status_code=200
                 )
 
-            # ==============================================================
+            # ------------------------------------------------------
             # FOLIO ENCONTRADO
-            # ==============================================================
+            # ------------------------------------------------------
             r = res.data[0]
 
-            fecha_exp = parse_fecha(r.get("fecha_expedicion"))
-            fecha_ven = parse_fecha(r.get("fecha_vencimiento"))
+            fecha_exp = _parse_fecha(r.get("fecha_expedicion"))
+            fecha_ven = _parse_fecha(r.get("fecha_vencimiento"))
 
             vigente = fecha_ven is not None and hoy <= fecha_ven
 
@@ -390,21 +504,17 @@ def crear_router_consulta(supabase, entidad: str, timezone: str) -> APIRouter:
                 clase = "ok"
                 icono = "✓"
                 titulo_estado = "PERMISO VIGENTE"
-                sub_estado = (
-                    "El permiso se encuentra dentro de su periodo de vigencia."
-                )
+                sub_estado = "El permiso se encuentra dentro de su periodo de vigencia."
             else:
                 clase = "venc"
                 icono = "!"
                 titulo_estado = "PERMISO VENCIDO"
-                sub_estado = (
-                    "El periodo de vigencia de este permiso ha concluido."
-                )
+                sub_estado = "El periodo de vigencia de este permiso ha concluido."
 
             fe_txt = fecha_exp.strftime("%d/%m/%Y") if fecha_exp else "—"
             fv_txt = fecha_ven.strftime("%d/%m/%Y") if fecha_ven else "—"
 
-            # ---------------- Barra de vigencia ----------------
+            # Barra de vigencia
             pct = 0
             texto_vig = ""
 
@@ -440,76 +550,64 @@ def crear_router_consulta(supabase, entidad: str, timezone: str) -> APIRouter:
 
                 pct = max(0, min(100, pct))
 
+            vig_html = (
+                f'<div class="rc-vig-txt">{_esc(texto_vig)}</div>'
+                if texto_vig else ""
+            )
+
             contenido = f"""
-    <article class="res">
+<div class="rc-wrap">
+{_cabecera_resultado()}
+  <div class="rc-card">
 
-      <div class="banner {clase}">
-        <div class="banner-ico">{icono}</div>
-        <div>
-          <h2>{titulo_estado}</h2>
-          <p>{sub_estado}</p>
-        </div>
+    <div class="rc-status {clase}">
+      <div class="rc-ico">{icono}</div>
+      <div>
+        <h2>{titulo_estado}</h2>
+        <p>{sub_estado}</p>
       </div>
+    </div>
 
-      <div class="folio-box">
+    <div class="rc-body">
+
+      <div class="rc-folio">
         <span>FOLIO</span>
-        <strong>{esc(folio)}</strong>
+        <strong>{_esc(folio)}</strong>
         <i></i>
       </div>
 
-      <div class="body">
+      <h3 class="rc-sub">Información del permiso</h3>
 
-        <section class="bloque">
-          <h3>Titular</h3>
-          <div class="titular">
-            <span>Contribuyente</span>
-            <strong>{esc(r.get("contribuyente"))}</strong>
-          </div>
-        </section>
-
-        <section class="bloque">
-          <h3>Vehículo</h3>
-          <div class="grid">
-            <div class="dato"><span>Marca</span><strong>{esc(r.get("marca"))}</strong></div>
-            <div class="dato"><span>Línea / Modelo</span><strong>{esc(r.get("linea"))}</strong></div>
-            <div class="dato"><span>Año</span><strong>{esc(r.get("anio"))}</strong></div>
-            <div class="dato"><span>Color</span><strong>{esc(r.get("color"))}</strong></div>
-            <div class="dato wide"><span>Número de serie / NIV</span><strong class="mono">{esc(r.get("numero_serie"))}</strong></div>
-            <div class="dato wide"><span>Número de motor</span><strong class="mono">{esc(r.get("numero_motor"))}</strong></div>
-          </div>
-        </section>
-
-        <section class="bloque">
-          <h3>Vigencia</h3>
-          <div class="vig">
-            <div class="vig-fechas">
-              <div><span>Expedición</span><strong>{fe_txt}</strong></div>
-              <div><span>Vencimiento</span><strong>{fv_txt}</strong></div>
-            </div>
-            <div class="barra"><b class="{clase}" style="width:{pct}%"></b></div>
-            <div class="vig-txt">{esc(texto_vig) if texto_vig else ""}</div>
-          </div>
-        </section>
-
-        <div class="sello">
-          <div class="lock">🔒</div>
-          <div>
-            <b>Consulta verificada.</b>
-            La información mostrada corresponde al registro asociado al folio
-            consultado al día {hoy.strftime("%d/%m/%Y")}.
-          </div>
-        </div>
-
-        <div class="acciones">
-          <button class="btn" type="button" onclick="window.print()">Imprimir constancia</button>
-        </div>
-
+      <div class="rc-grid">
+        <div class="rc-item wide"><span>Contribuyente</span><strong>{_esc(r.get("contribuyente"))}</strong></div>
+        <div class="rc-item"><span>Marca</span><strong>{_esc(r.get("marca"))}</strong></div>
+        <div class="rc-item"><span>Línea / Modelo</span><strong>{_esc(r.get("linea"))}</strong></div>
+        <div class="rc-item"><span>Año</span><strong>{_esc(r.get("anio"))}</strong></div>
+        <div class="rc-item"><span>Color</span><strong>{_esc(r.get("color"))}</strong></div>
+        <div class="rc-item"><span>Número de serie / NIV</span><strong>{_esc(r.get("numero_serie"))}</strong></div>
+        <div class="rc-item"><span>Número de motor</span><strong>{_esc(r.get("numero_motor"))}</strong></div>
+        <div class="rc-item"><span>Fecha de expedición</span><strong>{fe_txt}</strong></div>
+        <div class="rc-item"><span>Fecha de vencimiento</span><strong>{fv_txt}</strong></div>
       </div>
-    </article>
-    """
+
+      <div class="rc-vig">
+        <div class="rc-bar"><b class="{clase}" style="width:{pct}%"></b></div>
+        {vig_html}
+      </div>
+
+      <div class="rc-note">
+        <b>Consulta verificada.</b>
+        La información mostrada corresponde al registro asociado al folio
+        consultado al día {hoy.strftime("%d/%m/%Y")}.
+      </div>
+
+    </div>
+  </div>
+</div>
+"""
 
             return HTMLResponse(
-                content=armar_pagina(contenido, hoy.year),
+                content=_pagina(contenido, hoy.year),
                 status_code=200
             )
 
@@ -521,20 +619,25 @@ def crear_router_consulta(supabase, entidad: str, timezone: str) -> APIRouter:
                 f"{repr(e)}"
             )
 
-            contenido_error = """
-    <article class="res">
-      <div class="banner err">
-        <div class="banner-ico">!</div>
-        <div>
-          <h2>NO FUE POSIBLE REALIZAR LA CONSULTA</h2>
-          <p>Inténtalo nuevamente en unos minutos.</p>
-        </div>
+            contenido_error = f"""
+<div class="rc-wrap">
+{_cabecera_resultado()}
+  <div class="rc-card">
+    <div class="rc-status err">
+      <div class="rc-ico">!</div>
+      <div>
+        <h2>NO FUE POSIBLE REALIZAR LA CONSULTA</h2>
+        <p>Inténtalo nuevamente en unos minutos.</p>
       </div>
-      <div class="noenc"><p>Si el problema continúa, comunícate con la Secretaría de Movilidad y Transporte.</p></div>
-    </article>
-    """
+    </div>
+    <div class="rc-empty">
+      Si el problema continúa, comunícate con la Secretaría de Movilidad y Transporte.
+    </div>
+  </div>
+</div>
+"""
             return HTMLResponse(
-                content=armar_pagina(
+                content=_pagina(
                     contenido_error,
                     datetime.now(ZoneInfo(timezone)).year
                 ),
