@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -139,6 +140,25 @@ class BotPueblaRuntime:
                 del self.user_folios[uid]
         return True
 
+    def snapshot_timers(self):
+        """Lista de timers activos para el panel."""
+        out = []
+        for folio, item in list(self.timers_activos.items()):
+            out.append({
+                "folio": folio,
+                "user_id": item.get("user_id"),
+                "restante": self._tiempo_restante(folio),
+            })
+        return out
+
+    def cancelar_todos(self) -> int:
+        """Mata TODOS los timers en RAM, sin importar el usuario."""
+        n = 0
+        for folio in list(self.timers_activos.keys()):
+            if self.cancelar_timer_folio(folio):
+                n += 1
+        return n
+
     def limpiar_timer_folio(self, folio: str):
         item = self.timers_activos.get(folio)
         if not item:
@@ -179,6 +199,13 @@ class BotPueblaRuntime:
                 )
             ])
 
+        botones.append([
+            InlineKeyboardButton(
+                text="🛑 Cancelar TODOS los timers",
+                callback_data="cancelar_todos",
+            )
+        ])
+
         lineas.extend([
             "",
             "Si NO detienes un timer, el folio seguirá su cuenta de 36 horas y se eliminará automáticamente al vencer."
@@ -201,7 +228,7 @@ def crear_bot_puebla(
     generar_folio_async,
     generar_pdf,
 ):
-    bot = Bot(token=bot_token)
+    bot = Bot(token=bot_token, session=AiohttpSession(timeout=300))
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     runtime = BotPueblaRuntime(
@@ -261,6 +288,51 @@ def crear_bot_puebla(
             await callback.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
+
+    @dp.callback_query(lambda c: c.data == "cancelar_todos")
+    async def cancelar_todos_cb(callback: CallbackQuery):
+        uid = callback.from_user.id
+        n = len([f for f in runtime.user_folios.get(uid, []) if f in runtime.timers_activos])
+        if n == 0:
+            await callback.answer("No tienes timers activos.", show_alert=True)
+            return
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Sí, cancelar todos", callback_data="cancelar_todos_si"),
+            InlineKeyboardButton(text="❌ No", callback_data="cancelar_todos_no"),
+        ]])
+        await callback.answer()
+        await callback.message.answer(
+            "⚠️ CANCELAR TODOS LOS TIMERS\n\n"
+            f"Se detendrán {n} timer(es). Esos folios YA NO se eliminarán "
+            "automáticamente a las 36 horas.\n\n¿Confirmas?",
+            reply_markup=kb,
+        )
+
+    @dp.callback_query(lambda c: c.data == "cancelar_todos_no")
+    async def cancelar_todos_no_cb(callback: CallbackQuery):
+        await callback.answer("Cancelado, tus timers siguen activos.")
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+
+    @dp.callback_query(lambda c: c.data == "cancelar_todos_si")
+    async def cancelar_todos_si_cb(callback: CallbackQuery):
+        uid = callback.from_user.id
+        folios = [f for f in list(runtime.user_folios.get(uid, [])) if f in runtime.timers_activos]
+        n = 0
+        for f in folios:
+            if runtime.cancelar_timer_folio(f):
+                n += 1
+        await callback.answer("Timers detenidos", show_alert=True)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await callback.message.answer(
+            "🛑 TIMERS DETENIDOS\n\n"
+            f"Se detuvieron {n} timer(es). Esos folios ya NO se eliminarán automáticamente."
+        )
 
     @dp.message(PermisoForm.marca)
     async def get_marca(message: types.Message, state: FSMContext):
